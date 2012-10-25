@@ -53,6 +53,7 @@
   <ItemGroup>
     <Compile Include="D3D9Hook\EndSceneDetour.cs" />
     <Compile Include="D3D9Hook\NativeAPI.cs" />
+    <Compile Include="Proxy.cs" />
     <Compile Include="Scheduling\Dispatcher.cs" />
     <Compile Include="Loader.cs" />
     <Compile Include="Misc.cs" />

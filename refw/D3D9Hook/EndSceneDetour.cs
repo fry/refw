@@ -188,5 +188,19 @@ namespace refw.D3D {
 			NativeAPI.SendMessage(Hwnd, 0x232, IntPtr.Zero, IntPtr.Zero);
 			return result;
 		}
+
+		public void LeftClick(int x, int y) {
+			var wparam = (IntPtr)NativeAPI.MK_LBUTTON;
+			var lparam = (IntPtr)(y << 16 | x);
+			NativeAPI.SendMessage(Hwnd, NativeAPI.WM_LBUTTONDOWN, wparam, lparam);
+			NativeAPI.SendMessage(Hwnd, NativeAPI.WM_LBUTTONUP, wparam, lparam);
+		}
+
+		public refw.NativeAPI.Rect? GetClientRect() {
+			refw.NativeAPI.Rect rect;
+			if (!NativeAPI.GetClientRect(Hwnd, out rect))
+				return null;
+			return rect;
+		}
 	}
 }

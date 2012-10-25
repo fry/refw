@@ -15,11 +15,20 @@ namespace refw {
 		public const int WM_KEYDOWN = 0x0100;
 		public const int WM_KEYUP = 0x0101;
 		public const int WM_GETMINMAXINFO = 0x0024;
+		public const int WM_LBUTTONDOWN = 0x0201;
+		public const int WM_LBUTTONUP = 0x0202;
+
+		public const int MK_LBUTTON = 0x0001;
 
 		[StructLayout(LayoutKind.Sequential)]
 		public struct Point {
 			public int X;
 			public int Y;
+		}
+
+		[StructLayout(LayoutKind.Sequential)]
+		public struct Rect {
+			public int Left, Top, Right, Bottom;
 		}
 
 		[StructLayout(LayoutKind.Sequential)]
@@ -58,6 +67,9 @@ namespace refw {
 
 		[DllImport("user32.dll")]
 		public static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+		[DllImport("user32.dll")]
+		public static extern bool GetClientRect(IntPtr hwnd, out Rect rect);
 
 		[UnmanagedFunctionPointer(CallingConvention.StdCall)]
 		public delegate IntPtr WndProcDelegate(IntPtr hwnd, int msg, IntPtr wparam, IntPtr lparam);

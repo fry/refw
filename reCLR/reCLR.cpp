@@ -27,6 +27,8 @@ static CLRParameters* clrParams;
 
 // Parses a command line string into its argument according to the Windows default
 static array<String^>^ SplitArgs(String^ command_line) {
+	if (command_line->Length == 0)
+		return gcnew array<String^>(0);
 	array<String^>^ split_args;
 	int argc;
 	auto command_line_w = marshal_as<std::wstring>(command_line);
