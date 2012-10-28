@@ -164,3 +164,15 @@ void reCLR::Loader::SetProxy(String^ addr, int port) {
   g_proxyService.sin_addr.s_addr = inet_addr(context.marshal_as<const char*>(addr));
   g_proxyService.sin_port = htons(port);
 }
+
+void reCLR::Loader::SetProxyAuth(String^ username, String^ password) {
+	marshal_context context;
+
+	if (username != nullptr && password != nullptr) {
+		g_allow_user_pass_auth = true;
+		g_username = context.marshal_as<const char*>(username);
+		g_password = context.marshal_as<const char*>(password);
+	} else {
+		g_allow_user_pass_auth = false;
+	}
+}

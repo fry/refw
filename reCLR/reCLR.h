@@ -12,5 +12,6 @@ namespace reCLR {
 		static void LoadAssemblyInDomain(String^ assembly_path, String^ assembly_args);
 		static int ConnectHookWrapper(IntPtr s, IntPtr name, int namelen);
 		static void SetProxy(String^ addr, int port);
+		static void SetProxyAuth(String^ username, String^ password);
 	};
 }
