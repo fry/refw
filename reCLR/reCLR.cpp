@@ -166,7 +166,12 @@ void InjectDLL(DWORD process_id, const std::string& dll_name, CLRParameters* par
 
   LoadLibAddy = (LPVOID)GetProcAddress(GetModuleHandle("kernel32.dll"), "LoadLibraryA");
   RemoteString = (LPVOID)VirtualAllocEx(process, NULL, dll_name.size(), MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-  WriteProcessMemory(process, (LPVOID)RemoteString, dll_name.c_str(), dll_name.size(), NULL);
+  BOOL wpmError = WriteProcessMemory(process, (LPVOID)RemoteString, dll_name.c_str(), dll_name.size(), NULL);
+  if (!wpmError) {
+	  std::ostringstream ss;
+	  ss << "WriteProcessMemory failed: " << GetLastError();
+	  throw std::runtime_error(ss.str());
+  }
   HANDLE remoteThread = CreateRemoteThread(process, NULL, NULL, (LPTHREAD_START_ROUTINE)LoadLibAddy, (LPVOID)RemoteString, NULL, NULL);
   // wait for LoadLibrary to finish
   if (WaitForSingleObject(remoteThread, INFINITE) != WAIT_OBJECT_0)
