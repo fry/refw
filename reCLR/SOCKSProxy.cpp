@@ -5,11 +5,14 @@
 #include <string>
 #include <vector>
 #include <cassert>
+#include <map>
 
 #include <msclr\marshal_cppstd.h>
 #include <msclr\marshal.h>
 
 using namespace msclr::interop;
+using namespace System;
+using namespace System::Windows::Forms;
 
 struct ServerChoicePacket {
 	unsigned char version;
@@ -21,19 +24,103 @@ struct ServerAuthenticationResponsePacket {
 	unsigned char status;
 };
 
+// Wrapper for socket name. We still need to allocate this on the heap, since
+// we don't implement copy/move assignment operators.
+struct SocknameWrapper {
+	sockaddr* name;
+	int namelen;
+
+	SocknameWrapper(const sockaddr* name, int namelen) {
+		this->namelen = namelen;
+		this->name = (sockaddr*)malloc(namelen);
+		memcpy(this->name, name, namelen);
+	}
+
+	~SocknameWrapper() {
+		if (name != nullptr) {
+			free(name);
+		}
+	}
+};
+
 sockaddr_in g_proxyService;
 bool g_allow_user_pass_auth = false;
 std::string g_username;
 std::string g_password;
+std::map<SOCKET, std::shared_ptr<SocknameWrapper>> g_real_socknames;
+
+int getsockname_hook(SOCKET s, sockaddr *name, int *namelen) {
+	auto iter = g_real_socknames.find(s);
+	if (iter != g_real_socknames.end()) {
+		auto name_override = iter->second;
+
+		// Output buffer is too small
+		if (*namelen < name_override->namelen) {
+			WSASetLastError(WSAEFAULT);
+			return SOCKET_ERROR;
+		}
+
+		// Copy name override to outbut buffer
+		const sockaddr_in* name_in = (const sockaddr_in*)name_override->name;
+		memcpy(name, name_override->name, name_override->namelen);
+		*namelen = name_override->namelen;
+		return 0;
+	}
+
+	return getsockname(s, name, namelen);
+}
 
 int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
 	assert(name->sa_family == AF_INET);
 	const sockaddr_in* name_in = (const sockaddr_in*)name;
 
-	int error_code = connect(s, (sockaddr*)&g_proxyService, sizeof(g_proxyService));
-	if (error_code != 0)
-		return error_code;
+	char* addr_str = inet_ntoa(name_in->sin_addr);
+	unsigned short port = ntohs(name_in->sin_port);
 
+	// don't detour localhost loopback
+	if (name_in->sin_addr.S_un.S_addr == inet_addr("127.0.0.1")) {
+		return connect(s, name, namelen);
+	}
+
+	// Remember original socket name. We are kind of leaking memory here until
+	// we start hooking closesocket() and deallocating, but socket number
+	// reuse and low number of sockets shouldn't make this matter anyway
+	g_real_socknames[s] = std::shared_ptr<SocknameWrapper>(new SocknameWrapper(name, namelen));
+
+	unsigned long blocking = 0;
+
+	// Keep waiting for connect to finish if this is a non-blocking socket
+	int wsa_error_code = 0;
+	int error_code = 0;
+	bool first_try = true;
+
+	// Windows offers no way to check a socket's blocking state, since /normally/
+	// you would already know this. We don't, so we have to handle a possible
+	// WSAEWOULDBLOCK
+	while (true) {
+		error_code = connect(s, (sockaddr*)&g_proxyService, sizeof(g_proxyService));
+		if (error_code != 0) {
+			wsa_error_code = WSAGetLastError();
+			// Socket discovered to be blocking -> set to non-blocking & remember old state
+			if (wsa_error_code == WSAEWOULDBLOCK) {
+				ioctlsocket(s, FIONBIO, &blocking);
+				blocking = 1;
+			}
+			// Wait until connection attempt finishes
+			else if (wsa_error_code != WSAEINVAL && wsa_error_code != WSAEALREADY)
+				break;
+			first_try = false;
+		}
+	}
+	
+	// Only when we get WSAEISCONN on the first connect attempt is this an
+	// actual error, otherwise we just finished the non-blocking connection
+	// attempt
+	if (error_code != 0 && (wsa_error_code != WSAEISCONN && !first_try)) {
+		MessageBox::Show(String::Format("Connection to proxy failed: {0}, {1}", error_code, wsa_error_code));
+		return error_code;
+	}
+	
 	// send identify request
 	std::vector<unsigned char> data_identify;
 	// SOCKS version
@@ -65,7 +152,7 @@ int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
 	}
 
 	if (server_choice_packet.method == 0xFF) {
-		printf("SOCKS5 proxy does not support authentication methods 0 or 2\n");
+		MessageBox::Show("SOCKS5 proxy does not support authentication methods 0 or 2");
 		closesocket(s);
 		WSASetLastError(WSAENETDOWN);
 		return SOCKET_ERROR;
@@ -97,7 +184,7 @@ int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
 		}
 
 		if (auth_response_packet.status != 0x00) {
-			printf("SOCKS5 proxy authentication failed\n");
+			MessageBox::Show("SOCKS5 proxy authentication failed");
 			closesocket(s);
 			WSASetLastError(WSAENETDOWN);
 			return SOCKET_ERROR;
@@ -144,11 +231,13 @@ int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
 	assert(data_response[3] == 0x01);
 
 	if (data_response[1] != 0x00) {
-		printf("SOCKS5 proxy connection request failed: error code %d\n", data_response[1]);
+		MessageBox::Show(String::Format("SOCKS5 proxy connection request failed: error code {0}", data_response[1]));
 		closesocket(s);
 		WSASetLastError(WSAENETDOWN);
 		return SOCKET_ERROR;
 	}
+
+	ioctlsocket(s, FIONBIO, &blocking);
 
 	return 0;
 }
@@ -157,12 +246,16 @@ int reCLR::Loader::ConnectHookWrapper(IntPtr s, IntPtr name, int namelen) {
 	return connect_hook((SOCKET)s.ToInt32(), (sockaddr*)name.ToInt32(), namelen);
 }
 
+int reCLR::Loader::GetsocknameHookWrapper(IntPtr s, IntPtr name, IntPtr namelen) {
+	return getsockname_hook((SOCKET)s.ToInt32(), (sockaddr*)name.ToInt32(), (int*)namelen.ToPointer());
+}
+
 void reCLR::Loader::SetProxy(String^ addr, int port) {
 	marshal_context context;
 
 	g_proxyService.sin_family = AF_INET;
-  g_proxyService.sin_addr.s_addr = inet_addr(context.marshal_as<const char*>(addr));
-  g_proxyService.sin_port = htons(port);
+	g_proxyService.sin_addr.s_addr = inet_addr(context.marshal_as<const char*>(addr));
+	g_proxyService.sin_port = htons(port);
 }
 
 void reCLR::Loader::SetProxyAuth(String^ username, String^ password) {
