@@ -22,9 +22,9 @@ namespace refw {
 					proxyHook = LocalHook.Create(connect_orig, proxyDetour, null);
 					proxyHook.ThreadACL.SetExclusiveACL(new int[] { });
 
-                    var getsockname_orig = LocalHook.GetProcAddress("Ws2_32", "getsockname");
-                    proxyNameDetour = new GetsocknameDelegate(reCLR.Loader.GetsocknameHookWrapper);
-                    proxyNameHook = LocalHook.Create(getsockname_orig, proxyNameDetour, null);
+                    var getpeerame_orig = LocalHook.GetProcAddress("Ws2_32", "getpeername");
+                    proxyNameDetour = new GetsocknameDelegate(reCLR.Loader.GetpeernameHookWrapper);
+                    proxyNameHook = LocalHook.Create(getpeerame_orig, proxyNameDetour, null);
                     proxyNameHook.ThreadACL.SetExclusiveACL(new int[] { });
 				} else if (proxyHook != null && !value) {
 					proxyHook.Dispose();

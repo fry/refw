@@ -47,11 +47,11 @@ sockaddr_in g_proxyService;
 bool g_allow_user_pass_auth = false;
 std::string g_username;
 std::string g_password;
-std::map<SOCKET, std::shared_ptr<SocknameWrapper>> g_real_socknames;
+std::map<SOCKET, std::shared_ptr<SocknameWrapper>> g_real_peernames;
 
-int getsockname_hook(SOCKET s, sockaddr *name, int *namelen) {
-	auto iter = g_real_socknames.find(s);
-	if (iter != g_real_socknames.end()) {
+int getpeername_hook(SOCKET s, sockaddr *name, int *namelen) {
+	auto iter = g_real_peernames.find(s);
+	if (iter != g_real_peernames.end()) {
 		auto name_override = iter->second;
 
 		// Output buffer is too small
@@ -62,12 +62,13 @@ int getsockname_hook(SOCKET s, sockaddr *name, int *namelen) {
 
 		// Copy name override to outbut buffer
 		const sockaddr_in* name_in = (const sockaddr_in*)name_override->name;
+
 		memcpy(name, name_override->name, name_override->namelen);
 		*namelen = name_override->namelen;
 		return 0;
 	}
 
-	return getsockname(s, name, namelen);
+	return getpeername(s, name, namelen);
 }
 
 int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
@@ -82,10 +83,9 @@ int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
 		return connect(s, name, namelen);
 	}
 
-	// Remember original socket name. We are kind of leaking memory here until
-	// we start hooking closesocket() and deallocating, but socket number
-	// reuse and low number of sockets shouldn't make this matter anyway
-	g_real_socknames[s] = std::shared_ptr<SocknameWrapper>(new SocknameWrapper(name, namelen));
+	if (name_in->sin_addr.S_un.S_addr == inet_addr("0.0.0.0")) {
+		return connect(s, name, namelen);
+	}
 
 	unsigned long blocking = 0;
 
@@ -239,6 +239,11 @@ int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
 
 	ioctlsocket(s, FIONBIO, &blocking);
 
+	// Remember original socket name. We are kind of leaking memory here until
+	// we start hooking closesocket() and deallocating, but socket number
+	// reuse and low number of sockets shouldn't make this matter anyway
+	g_real_peernames[s] = std::shared_ptr<SocknameWrapper>(new SocknameWrapper(name, namelen));
+
 	return 0;
 }
 
@@ -246,8 +251,8 @@ int reCLR::Loader::ConnectHookWrapper(IntPtr s, IntPtr name, int namelen) {
 	return connect_hook((SOCKET)s.ToInt32(), (sockaddr*)name.ToInt32(), namelen);
 }
 
-int reCLR::Loader::GetsocknameHookWrapper(IntPtr s, IntPtr name, IntPtr namelen) {
-	return getsockname_hook((SOCKET)s.ToInt32(), (sockaddr*)name.ToInt32(), (int*)namelen.ToPointer());
+int reCLR::Loader::GetpeernameHookWrapper(IntPtr s, IntPtr name, IntPtr namelen) {
+	return getpeername_hook((SOCKET)s.ToInt32(), (sockaddr*)name.ToInt32(), (int*)namelen.ToPointer());
 }
 
 void reCLR::Loader::SetProxy(String^ addr, int port) {
