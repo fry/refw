@@ -1,7 +1,7 @@
 refw
 ====
 
-refw is a relatively simple and compact .NET library for injecting managed .NET assemblies into applications on Windows. It is written in C# and C++.NET for the more native parts. The intent is to also include other functionality and libraries that common or not-so-common injected applications may require. Currently this helper functions and wrappers for cross-thread execution, DirectX 9 EndScene hooking, address offset manipulation for converting function pointers to delegates and dealing with ASLR and a SOCKS proxy hook.
+refw is a relatively simple and compact .NET library for injecting managed .NET assemblies into applications on Windows. It is written in C# and C++.NET for the more native parts. The intent is to also include other functionality and libraries that common or not-so-common injected applications may require. Currently this includes helper functions and wrappers for cross-thread execution, DirectX 9 EndScene hooking, address offset manipulation for converting function pointers to delegates and dealing with ASLR and a SOCKS proxy hook.
 
 Except for EasyHook the library does not depend on any other libraries.
 
