@@ -104,9 +104,12 @@ void ThreadInitialize() {
 }
 
 extern "C" __declspec(dllexport) void WakeUpProcess() {
+	if (clrParams->WakeUpThreadID == 0)
+		return;
 	HANDLE handle = OpenThread(THREAD_SUSPEND_RESUME, FALSE, clrParams->WakeUpThreadID);
 	ResumeThread(handle);
 	CloseHandle(handle);
+	clrParams->WakeUpThreadID = 0;
 }
 
 extern "C" __declspec(dllexport) DWORD WINAPI Initialize(LPVOID threadData) {
@@ -234,13 +237,7 @@ int reCLR::Loader::CreateProcessAndInject(String^ process_name, String^ command_
 }
 
 int reCLR::Loader::CreateProcessAndInject(String^ process_name, String^ command_line, String^ assembly, String^ assembly_args, bool display_errors) {
-	// Expand assembly name if it points to a library
-	if (File::Exists(assembly))
-		assembly = Path::GetFullPath(assembly);
-
 	marshal_context context;
-	auto full_CLR_name = Path::GetFullPath(gcnew String(DLL_FILE));
-
 	// Set up CreateProcess structures
   STARTUPINFO si;
   PROCESS_INFORMATION pi;
@@ -267,6 +264,17 @@ int reCLR::Loader::CreateProcessAndInject(String^ process_name, String^ command_
 		throw gcnew InvalidOperationException(String::Format("Failed to create process {0}, error code {1}", process_name, error_code));
 	}
 
+	reCLR::Loader::Inject(pi.dwProcessId, command_line, assembly, assembly_args, display_errors, pi.dwThreadId);
+	return pi.dwProcessId;
+}
+
+void reCLR::Loader::Inject(int process_id, String^ command_line, String^ assembly, String^ assembly_args, bool display_errors, int wakeup_thread_id) {
+	// Expand assembly name if it points to a library
+	if (File::Exists(assembly))
+		assembly = Path::GetFullPath(assembly);
+	
+	auto full_CLR_name = Path::GetFullPath(gcnew String(DLL_FILE));
+
 	CLRParameters parameters;
 
 	// Copy assembly name into parameters structure
@@ -274,7 +282,7 @@ int reCLR::Loader::CreateProcessAndInject(String^ process_name, String^ command_
   memcpy(parameters.DotNetFile, assembly_str.c_str(), assembly_str.size());
   parameters.DotNetFile[assembly_str.size()] = 0;
 
-  parameters.WakeUpThreadID = pi.dwThreadId;
+  parameters.WakeUpThreadID = wakeup_thread_id;
 	parameters.DisplayErrors = display_errors;
 
 	// Copy assembly arguments into parameters structure
@@ -283,11 +291,9 @@ int reCLR::Loader::CreateProcessAndInject(String^ process_name, String^ command_
 	parameters.DotNetArgs[assembly_args_str.size()] = 0;
 
 	try {
-		InjectDLL(pi.dwProcessId, marshal_as<std::string>(full_CLR_name), &parameters);
+		InjectDLL(process_id, marshal_as<std::string>(full_CLR_name), &parameters);
 	} catch (std::exception& ex) {
 		throw gcnew InvalidOperationException(marshal_as<String^>(ex.what()));
 	}
-
-	return pi.dwProcessId;
 }
 

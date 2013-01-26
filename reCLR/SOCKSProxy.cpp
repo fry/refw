@@ -117,7 +117,8 @@ int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
 	// actual error, otherwise we just finished the non-blocking connection
 	// attempt
 	if (error_code != 0 && (wsa_error_code != WSAEISCONN && !first_try)) {
-		//MessageBox::Show(String::Format("Connection to proxy failed: {0}, {1}", error_code, wsa_error_code));
+		if (reCLR::Loader::OnProxyError != nullptr)
+			reCLR::Loader::OnProxyError(reCLR::ProxyErrorType::ConnectFailed, String::Format("Connection to proxy failed: {0}, {1}", error_code, wsa_error_code));
 		return error_code;
 	}
 	
@@ -138,6 +139,8 @@ int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
 	error_code = send(s, (char*)&data_identify.front(), data_identify.size(), 0);
 
 	if (error_code == SOCKET_ERROR) {
+		if (reCLR::Loader::OnProxyError != nullptr)
+			reCLR::Loader::OnProxyError(reCLR::ProxyErrorType::ConnectFailed, "Send 1 failed");
 		WSASetLastError(WSAENETDOWN);
 		return SOCKET_ERROR;
 	}
@@ -147,12 +150,15 @@ int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
 	error_code = recv(s, (char*)&server_choice_packet, sizeof(ServerChoicePacket), MSG_WAITALL);
 
 	if (error_code == SOCKET_ERROR) {
+		if (reCLR::Loader::OnProxyError != nullptr)
+			reCLR::Loader::OnProxyError(reCLR::ProxyErrorType::ConnectFailed, "Recv 1 failed");
 		WSASetLastError(WSAENETDOWN);
 		return SOCKET_ERROR;
 	}
 
 	if (server_choice_packet.method == 0xFF) {
-		//MessageBox::Show("SOCKS5 proxy does not support authentication methods 0 or 2");
+		if (reCLR::Loader::OnProxyError != nullptr)
+			reCLR::Loader::OnProxyError(reCLR::ProxyErrorType::AuthFailed, "SOCKS5 proxy does not support authentication methods 0 or 2");
 		closesocket(s);
 		WSASetLastError(WSAENETDOWN);
 		return SOCKET_ERROR;
@@ -170,6 +176,8 @@ int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
 
 		error_code = send(s, (char*)&data.front(), data.size(), 0);
 		if (error_code == SOCKET_ERROR) {
+			if (reCLR::Loader::OnProxyError != nullptr)
+				reCLR::Loader::OnProxyError(reCLR::ProxyErrorType::ConnectFailed, "Auth Send 1 failed");
 			WSASetLastError(WSAENETDOWN);
 			return SOCKET_ERROR;
 		}
@@ -179,12 +187,15 @@ int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
 		error_code = recv(s, (char*)&auth_response_packet, sizeof(ServerAuthenticationResponsePacket), MSG_WAITALL);
 
 		if (error_code == SOCKET_ERROR) {
+			if (reCLR::Loader::OnProxyError != nullptr)
+				reCLR::Loader::OnProxyError(reCLR::ProxyErrorType::ConnectFailed, "Auth Recv 1 failed");
 			WSASetLastError(WSAENETDOWN);
 			return SOCKET_ERROR;
 		}
 
 		if (auth_response_packet.status != 0x00) {
-			//MessageBox::Show("SOCKS5 proxy authentication failed");
+			if (reCLR::Loader::OnProxyError != nullptr)
+				reCLR::Loader::OnProxyError(reCLR::ProxyErrorType::AuthFailed, "SOCKS5 proxy authentication failed");
 			closesocket(s);
 			WSASetLastError(WSAENETDOWN);
 			return SOCKET_ERROR;
@@ -212,6 +223,8 @@ int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
 	error_code = send(s, (char*)&data_request.front(), data_request.size(), 0);
 
 	if (error_code == SOCKET_ERROR) {
+		if (reCLR::Loader::OnProxyError != nullptr)
+			reCLR::Loader::OnProxyError(reCLR::ProxyErrorType::ConnectFailed, "Send 2 failed"); 
 		WSASetLastError(WSAENETDOWN);
 		return SOCKET_ERROR;
 	}
@@ -221,6 +234,8 @@ int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
 	error_code = recv(s, (char*)&data_response.front(), data_response.size(), MSG_WAITALL);
 
 	if (error_code == SOCKET_ERROR) {
+		if (reCLR::Loader::OnProxyError != nullptr)
+			reCLR::Loader::OnProxyError(reCLR::ProxyErrorType::ConnectFailed, "Recv 2 failed");
 		WSASetLastError(WSAENETDOWN);
 		return SOCKET_ERROR;
 	}	
@@ -231,7 +246,8 @@ int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
 	assert(data_response[3] == 0x01);
 
 	if (data_response[1] != 0x00) {
-		//MessageBox::Show(String::Format("SOCKS5 proxy connection request failed: error code {0}", data_response[1]));
+		if (reCLR::Loader::OnProxyError != nullptr)
+			reCLR::Loader::OnProxyError(reCLR::ProxyErrorType::ConnectFailed, String::Format("SOCKS5 proxy connection request failed: error code {0}", data_response[1]));
 		closesocket(s);
 		WSASetLastError(WSAENETDOWN);
 		return SOCKET_ERROR;

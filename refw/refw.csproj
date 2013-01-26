@@ -41,9 +41,6 @@
     <Reference Include="EasyHook">
       <HintPath>..\EasyHook\EasyHook.dll</HintPath>
     </Reference>
-    <Reference Include="reCLR">
-      <HintPath>..\Binaries\reCLR.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Windows.Forms" />
@@ -69,6 +66,12 @@
     <Content Include="EasyHook64.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\reCLR\reCLR.vcxproj">
+      <Project>{225097ee-89a7-42c3-8fcf-0c88ca6cdd63}</Project>
+      <Name>reCLR %28Visual Studio 2010%29</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

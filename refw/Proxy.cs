@@ -6,6 +6,16 @@ using EasyHook;
 
 namespace refw {
 	public static class Proxy {
+        // Proxy callback enums repeated from reCLR so users of the library don't have to reference reCLR
+        public enum ProxyErrorType {
+            ConnectFailed,
+            AuthFailed
+        }
+
+        public delegate void OnProxyErrorDelegate(ProxyErrorType type, string message);
+
+        public static event OnProxyErrorDelegate OnProxyError;
+
 		public delegate int ConnectDelegate(IntPtr s, IntPtr name, int namelen);
         public delegate int GetsocknameDelegate(IntPtr s, IntPtr name, IntPtr namelen);
 
@@ -26,6 +36,8 @@ namespace refw {
                     proxyNameDetour = new GetsocknameDelegate(reCLR.Loader.GetpeernameHookWrapper);
                     proxyNameHook = LocalHook.Create(getpeerame_orig, proxyNameDetour, null);
                     proxyNameHook.ThreadACL.SetExclusiveACL(new int[] { });
+
+                    reCLR.Loader.OnProxyError = OnProxyErrorCallback;
 				} else if (proxyHook != null && !value) {
 					proxyHook.Dispose();
 					proxyHook = null;
@@ -47,5 +59,12 @@ namespace refw {
 		public static void SetProxyAuth(string username, string password) {
 			reCLR.Loader.SetProxyAuth(username, password);
 		}
+
+        static void OnProxyErrorCallback(reCLR.ProxyErrorType error, string msg) {
+            if (OnProxyError == null)
+                return;
+
+            OnProxyError((ProxyErrorType)error, msg);
+        }
 	}
 }

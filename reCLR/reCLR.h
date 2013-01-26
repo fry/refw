@@ -5,8 +5,18 @@
 using namespace System;
 
 namespace reCLR {
+	public enum ProxyErrorType {
+		ConnectFailed,
+		AuthFailed
+	};
+
+	public delegate void OnProxyErrorDelegate(ProxyErrorType type, String^ message);
+
 	public ref class Loader {
 	public:
+
+		static OnProxyErrorDelegate^ OnProxyError;
+		static void Inject(int process_id, String^ command_line, String^ assembly, String^ assembly_args, bool display_errors, int wakeup_thread_id);
 		static int CreateProcessAndInject(String^ process_name, String^ command_line, String^ assembly, bool display_errors);
 		static int CreateProcessAndInject(String^ process_name, String^ command_line, String^ assembly, String^ assembly_args, bool display_errors);
 		static void LoadAssemblyInDomain(String^ assembly_path, String^ assembly_args);

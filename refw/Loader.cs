@@ -52,6 +52,18 @@ namespace refw {
 			return reCLR.Loader.CreateProcessAndInject(process_name, BuildCommandLine(args), assembly, BuildCommandLine(assembly_args), display_errors);
 		}
 
+        public static void Inject(int process_id, string command_line, string assembly, bool display_errors = false) {
+            reCLR.Loader.Inject(process_id, command_line, assembly, "", display_errors, 0);
+        }
+
+        public static void Inject(int process_id, string command_line, string assembly, string assembly_args, bool display_errors = false) {
+            reCLR.Loader.Inject(process_id, command_line, assembly, assembly_args, display_errors, 0);
+        }
+
+        public static void Inject(int process_id, string[] args, string assembly, string[] assembly_args, bool display_errors = false) {
+            reCLR.Loader.Inject(process_id, BuildCommandLine(args), assembly, BuildCommandLine(assembly_args), display_errors, 0);
+        }
+
 		static string BuildCommandLine(string[] args) {
 			return String.Join(" ", args.Select(s => String.Format("\"{0}\"", s)));
 		}
