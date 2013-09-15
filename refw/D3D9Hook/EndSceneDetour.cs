@@ -15,6 +15,10 @@ namespace refw.D3D {
 		/// </summary>
 		public event Action<TimeSpan> OnFrame;
 		/// <summary>
+		/// Invoked only on the first ever OnFrame event for this instance
+		/// </summary>
+		public event Action OnFirstFrame;
+		/// <summary>
 		/// Invoken when the device is created
 		/// </summary>
 		public event Action OnCreateDevice;
@@ -27,6 +31,8 @@ namespace refw.D3D {
 		/// Invoked when the DirectX device is reset.
 		/// </summary>
 		public event Action<IntPtr> OnResetDevice;
+
+		private bool _firstOnFrame = true;
 
 		// Measurements for frame-limiting
 		private Stopwatch _stopWatch = new Stopwatch();
@@ -56,7 +62,7 @@ namespace refw.D3D {
 		/// </summary>
 		public int? FrameLimit = null;
 
-		private int EndSceneCallback(IntPtr instance) {
+		public void ArtificialEndScene() {
 			long delta_ms = 0;
 			if (FrameLimit.HasValue) {
 				if (!_stopWatch.IsRunning) {
@@ -75,8 +81,18 @@ namespace refw.D3D {
 				}
 			}
 
+			if (_firstOnFrame) {
+				_firstOnFrame = false;
+				if (OnFirstFrame != null)
+					OnFirstFrame();
+			}
+
 			if (OnFrame != null)
 				OnFrame(TimeSpan.FromMilliseconds(delta_ms));
+		}
+
+		private int EndSceneCallback(IntPtr instance) {
+			ArtificialEndScene();
 
 			return (int)EndScene(instance);
 		}

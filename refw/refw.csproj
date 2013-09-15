@@ -38,7 +38,8 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="EasyHook">
+    <Reference Include="EasyHook, Version=2.5.0.0, Culture=neutral, PublicKeyToken=4b580fca19d0b0c5, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>..\EasyHook\EasyHook.dll</HintPath>
     </Reference>
     <Reference Include="System" />
@@ -53,6 +54,7 @@
   <ItemGroup>
     <Compile Include="D3D9Hook\EndSceneDetour.cs" />
     <Compile Include="D3D9Hook\NativeAPI.cs" />
+    <Compile Include="MemoryPatch.cs" />
     <Compile Include="Proxy.cs" />
     <Compile Include="Scheduling\Dispatcher.cs" />
     <Compile Include="Loader.cs" />
