@@ -71,7 +71,7 @@ int getpeername_hook(SOCKET s, sockaddr *name, int *namelen) {
 	return getpeername(s, name, namelen);
 }
 
-int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
+int proxy_negotiate(bool use_wsa_connect, SOCKET s, const sockaddr *name, int namelen, LPWSABUF lpCallerData, LPWSABUF lpCalleeData, LPQOS lpSQOS, LPQOS lpGQOS) {
 	assert(name->sa_family == AF_INET);
 	const sockaddr_in* name_in = (const sockaddr_in*)name;
 
@@ -80,11 +80,17 @@ int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
 
 	// don't detour localhost loopback
 	if (name_in->sin_addr.S_un.S_addr == inet_addr("127.0.0.1")) {
-		return connect(s, name, namelen);
+		if (!use_wsa_connect)
+			return connect(s, name, namelen);
+		else
+			return WSAConnect(s, name, namelen, lpCallerData, lpCalleeData, lpSQOS, lpGQOS);
 	}
 
 	if (name_in->sin_addr.S_un.S_addr == inet_addr("0.0.0.0")) {
-		return connect(s, name, namelen);
+		if (!use_wsa_connect)
+			return connect(s, name, namelen);
+		else
+			return WSAConnect(s, name, namelen, lpCallerData, lpCalleeData, lpSQOS, lpGQOS);
 	}
 
 	unsigned long blocking = 0;
@@ -98,7 +104,11 @@ int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
 	// you would already know this. We don't, so we have to handle a possible
 	// WSAEWOULDBLOCK
 	while (true) {
-		error_code = connect(s, (sockaddr*)&g_proxyService, sizeof(g_proxyService));
+		if (!use_wsa_connect)
+			error_code = connect(s, (sockaddr*)&g_proxyService, sizeof(g_proxyService));
+		else
+			error_code = WSAConnect(s, (sockaddr*)&g_proxyService, sizeof(g_proxyService), lpCallerData, lpCalleeData, lpSQOS, lpGQOS);
+
 		if (error_code != 0) {
 			wsa_error_code = WSAGetLastError();
 			// Socket discovered to be blocking -> set to non-blocking & remember old state
@@ -261,6 +271,19 @@ int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
 	g_real_peernames[s] = std::shared_ptr<SocknameWrapper>(new SocknameWrapper(name, namelen));
 
 	return 0;
+}
+
+int WSAConnect_hook(SOCKET s, const sockaddr *name, int namelen, LPWSABUF lpCallerData, LPWSABUF lpCalleeData, LPQOS lpSQOS, LPQOS lpGQOS) {
+	return proxy_negotiate(true, s, name, namelen, lpCallerData, lpCalleeData, lpSQOS, lpGQOS);
+}
+
+int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
+	return proxy_negotiate(false, s, name, namelen, NULL, NULL, NULL, NULL);
+}
+
+int reCLR::Loader::WSAConnectHookWrapper(IntPtr s, IntPtr name, int namelen, IntPtr lpCallerData, IntPtr lpCalleeData, IntPtr lpSQOS, IntPtr lpGQOS) {
+	return WSAConnect_hook((SOCKET)s.ToInt32(), (sockaddr*)name.ToInt32(), namelen,
+		(LPWSABUF)lpCallerData.ToInt32(), (LPWSABUF)lpCalleeData.ToInt32(), (LPQOS)lpSQOS.ToInt32(), (LPQOS)lpGQOS.ToInt32());
 }
 
 int reCLR::Loader::ConnectHookWrapper(IntPtr s, IntPtr name, int namelen) {
