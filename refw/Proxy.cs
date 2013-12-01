@@ -19,31 +19,43 @@ namespace refw {
 		public delegate int ConnectDelegate(IntPtr s, IntPtr name, int namelen);
 		public delegate int WSAConnectDelegate(IntPtr s, IntPtr name, int namelen, IntPtr lpCallerData, IntPtr lpCalleeData, IntPtr lpSQOS, IntPtr lpGQOS);
         public delegate int GetsocknameDelegate(IntPtr s, IntPtr name, IntPtr namelen);
+		public delegate IntPtr InternetOpenDelegate(IntPtr lpszAgent, IntPtr dwAccessType, IntPtr lpszProxyName, IntPtr lpszProxyBypass, IntPtr dwFlags);
 
 		static LocalHook proxyHook;
 		static LocalHook proxyHookWSA;
-        static LocalHook proxyNameHook;
+		static LocalHook proxyNameHook;
+		static LocalHook internetOpenHook;
 		static ConnectDelegate proxyDetour;
 		static WSAConnectDelegate proxyDetourWSA;
         static GetsocknameDelegate proxyNameDetour;
+		static InternetOpenDelegate internetOpenDetour;
 
 		public static bool IsEnabled {
 			set {
 				if (proxyHook == null && value) {
+					// Hook normal BSD connect()
 					var connect_orig = LocalHook.GetProcAddress("Ws2_32", "connect");
 					proxyDetour = new ConnectDelegate(reCLR.Loader.ConnectHookWrapper);
 					proxyHook = LocalHook.Create(connect_orig, proxyDetour, null);
 					proxyHook.ThreadACL.SetExclusiveACL(new int[] { });
 
+					// Hook WinSocks WSAConnect
 					var wsa_connect_orig = LocalHook.GetProcAddress("Ws2_32", "WSAConnect");
 					proxyDetourWSA = new WSAConnectDelegate(reCLR.Loader.WSAConnectHookWrapper);
 					proxyHookWSA = LocalHook.Create(wsa_connect_orig, proxyDetourWSA, null);
 					proxyHookWSA.ThreadACL.SetExclusiveACL(new int[] { });
 
+					// Hook getpeername to return original socket name
                     var getpeerame_orig = LocalHook.GetProcAddress("Ws2_32", "getpeername");
                     proxyNameDetour = new GetsocknameDelegate(reCLR.Loader.GetpeernameHookWrapper);
                     proxyNameHook = LocalHook.Create(getpeerame_orig, proxyNameDetour, null);
                     proxyNameHook.ThreadACL.SetExclusiveACL(new int[] { });
+
+					// Hook InternetOpen for HTTP connections
+					var internetopen_orig = LocalHook.GetProcAddress("Wininet", "InternetOpenW");
+					internetOpenDetour = new InternetOpenDelegate(reCLR.Loader.InternetOpenHookWrapper);
+					internetOpenHook = LocalHook.Create(internetopen_orig, internetOpenDetour, null);
+					internetOpenHook.ThreadACL.SetExclusiveACL(new int[] { });
 
                     reCLR.Loader.OnProxyError = OnProxyErrorCallback;
 				} else if (proxyHook != null && !value) {

@@ -6,6 +6,7 @@
 #include <vector>
 #include <cassert>
 #include <map>
+#include <Wininet.h>
 
 #include <msclr\marshal_cppstd.h>
 #include <msclr\marshal.h>
@@ -43,6 +44,8 @@ struct SocknameWrapper {
 	}
 };
 
+std::string g_proxyHost;
+int g_proxyPort;
 sockaddr_in g_proxyService;
 bool g_allow_user_pass_auth = false;
 std::string g_username;
@@ -60,7 +63,7 @@ int getpeername_hook(SOCKET s, sockaddr *name, int *namelen) {
 			return SOCKET_ERROR;
 		}
 
-		// Copy name override to outbut buffer
+		// Copy name override to output buffer
 		const sockaddr_in* name_in = (const sockaddr_in*)name_override->name;
 
 		memcpy(name, name_override->name, name_override->namelen);
@@ -79,7 +82,8 @@ int proxy_negotiate(bool use_wsa_connect, SOCKET s, const sockaddr *name, int na
 	unsigned short port = ntohs(name_in->sin_port);
 
 	// don't detour localhost loopback
-	if (name_in->sin_addr.S_un.S_addr == inet_addr("127.0.0.1")) {
+	if (    name_in->sin_addr.S_un.S_addr == inet_addr("127.0.0.1")
+		|| (name_in->sin_addr.S_un.S_addr == inet_addr(g_proxyHost.c_str()) && port == g_proxyPort)) {
 		if (!use_wsa_connect)
 			return connect(s, name, namelen);
 		else
@@ -273,12 +277,29 @@ int proxy_negotiate(bool use_wsa_connect, SOCKET s, const sockaddr *name, int na
 	return 0;
 }
 
+HINTERNET InternetOpen_hook(LPCTSTR lpszAgent, DWORD dwAccessType, LPCTSTR lpszProxyName, LPCTSTR lpszProxyBypass, DWORD dwFlags) {
+	marshal_context context;
+
+	dwAccessType = INTERNET_OPEN_TYPE_PROXY;
+	String^ proxy_str = String::Format("socks={0}:{1}", gcnew String(g_proxyHost.c_str()), g_proxyPort);
+
+	auto inet = InternetOpen(lpszAgent, dwAccessType, context.marshal_as<const char*>(proxy_str), lpszProxyBypass, dwFlags);
+	InternetSetOption(inet, INTERNET_OPTION_PROXY_USERNAME, (void*)g_username.c_str(), g_username.length());
+	InternetSetOption(inet, INTERNET_OPTION_PROXY_PASSWORD, (void*)g_password.c_str(), g_username.length());
+
+	return inet;
+}
+
 int WSAConnect_hook(SOCKET s, const sockaddr *name, int namelen, LPWSABUF lpCallerData, LPWSABUF lpCalleeData, LPQOS lpSQOS, LPQOS lpGQOS) {
 	return proxy_negotiate(true, s, name, namelen, lpCallerData, lpCalleeData, lpSQOS, lpGQOS);
 }
 
 int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
 	return proxy_negotiate(false, s, name, namelen, NULL, NULL, NULL, NULL);
+}
+
+IntPtr reCLR::Loader::InternetOpenHookWrapper(IntPtr lpszAgent, IntPtr dwAccessType, IntPtr lpszProxyName, IntPtr lpszProxyBypass, IntPtr dwFlags) {
+	return (IntPtr)InternetOpen_hook((LPCTSTR)lpszAgent.ToInt32(), (DWORD)dwAccessType.ToInt32(), (LPCTSTR)lpszProxyName.ToInt32(), (LPCTSTR)lpszProxyBypass.ToInt32(), (DWORD)dwFlags.ToInt32());
 }
 
 int reCLR::Loader::WSAConnectHookWrapper(IntPtr s, IntPtr name, int namelen, IntPtr lpCallerData, IntPtr lpCalleeData, IntPtr lpSQOS, IntPtr lpGQOS) {
@@ -296,6 +317,9 @@ int reCLR::Loader::GetpeernameHookWrapper(IntPtr s, IntPtr name, IntPtr namelen)
 
 void reCLR::Loader::SetProxy(String^ addr, int port) {
 	marshal_context context;
+
+	g_proxyHost = context.marshal_as<std::string>(addr);
+	g_proxyPort = port;
 
 	g_proxyService.sin_family = AF_INET;
 	g_proxyService.sin_addr.s_addr = inet_addr(context.marshal_as<const char*>(addr));

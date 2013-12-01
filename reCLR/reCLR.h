@@ -20,6 +20,8 @@ namespace reCLR {
 		static int CreateProcessAndInject(String^ process_name, String^ command_line, String^ assembly, bool display_errors);
 		static int CreateProcessAndInject(String^ process_name, String^ command_line, String^ assembly, String^ assembly_args, bool display_errors);
 		static void LoadAssemblyInDomain(String^ assembly_path, String^ assembly_args);
+
+		static IntPtr InternetOpenHookWrapper(IntPtr lpszAgent, IntPtr dwAccessType, IntPtr lpszProxyName, IntPtr lpszProxyBypass, IntPtr dwFlags);
 		static int WSAConnectHookWrapper(IntPtr s, IntPtr name, int namelen, IntPtr lpCallerData, IntPtr lpCalleeData, IntPtr lpSQOS, IntPtr lpGQOS);
 		static int ConnectHookWrapper(IntPtr s, IntPtr name, int namelen);
 		static int GetpeernameHookWrapper(IntPtr s, IntPtr name, IntPtr namelen);
