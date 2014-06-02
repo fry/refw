@@ -9,3 +9,6 @@ ipch
 .svn
 *.sdf
 *.opensdf
+.git_old
+Binaries
+*/Debug/
