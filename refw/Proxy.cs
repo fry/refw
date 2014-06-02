@@ -20,15 +20,19 @@ namespace refw {
 		public delegate int WSAConnectDelegate(IntPtr s, IntPtr name, int namelen, IntPtr lpCallerData, IntPtr lpCalleeData, IntPtr lpSQOS, IntPtr lpGQOS);
         public delegate int GetsocknameDelegate(IntPtr s, IntPtr name, IntPtr namelen);
 		public delegate IntPtr InternetOpenDelegate(IntPtr lpszAgent, IntPtr dwAccessType, IntPtr lpszProxyName, IntPtr lpszProxyBypass, IntPtr dwFlags);
+		public delegate int WSAIoctlDelegate(IntPtr s, IntPtr dwIoControlCode, IntPtr lpvInBuffer, IntPtr cbInBuffer, IntPtr lpvOutBuffer, IntPtr cbOutBuffer,
+			IntPtr lpcbBytesReturned, IntPtr lpOverlapped, IntPtr lpCompletionRoutine);
 
 		static LocalHook proxyHook;
 		static LocalHook proxyHookWSA;
 		static LocalHook proxyNameHook;
-		static LocalHook internetOpenHook;
+		//static LocalHook internetOpenHook;
+		static LocalHook proxyHookWSAIoctl;
 		static ConnectDelegate proxyDetour;
 		static WSAConnectDelegate proxyDetourWSA;
         static GetsocknameDelegate proxyNameDetour;
-		static InternetOpenDelegate internetOpenDetour;
+		static WSAIoctlDelegate proxyDetourWSAIoctl;
+		//static InternetOpenDelegate internetOpenDetour;
 
 		public static bool IsEnabled {
 			set {
@@ -51,11 +55,16 @@ namespace refw {
                     proxyNameHook = LocalHook.Create(getpeerame_orig, proxyNameDetour, null);
                     proxyNameHook.ThreadACL.SetExclusiveACL(new int[] { });
 
+					var wsaioctl_orig = LocalHook.GetProcAddress("Ws2_32", "WSAIoctl");
+                    proxyDetourWSAIoctl = new WSAIoctlDelegate(reCLR.Loader.WSAIoctlWrapper);
+                    proxyHookWSAIoctl = LocalHook.Create(wsaioctl_orig, proxyDetourWSAIoctl, null);
+                    proxyHookWSAIoctl.ThreadACL.SetExclusiveACL(new int[] { });
+
 					// Hook InternetOpen for HTTP connections
-					var internetopen_orig = LocalHook.GetProcAddress("Wininet", "InternetOpenW");
+					/*var internetopen_orig = LocalHook.GetProcAddress("Wininet", "InternetOpenW");
 					internetOpenDetour = new InternetOpenDelegate(reCLR.Loader.InternetOpenHookWrapper);
 					internetOpenHook = LocalHook.Create(internetopen_orig, internetOpenDetour, null);
-					internetOpenHook.ThreadACL.SetExclusiveACL(new int[] { });
+					internetOpenHook.ThreadACL.SetExclusiveACL(new int[] { });*/
 
                     reCLR.Loader.OnProxyError = OnProxyErrorCallback;
 				} else if (proxyHook != null && !value) {

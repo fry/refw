@@ -12,16 +12,19 @@ namespace refw {
 	/// </summary>
 	public class Dispatcher {
 		private ConcurrentQueue<Tuple<Action, EventWaitHandle>> invokeQueue = new ConcurrentQueue<Tuple<Action, EventWaitHandle>>();
+		private int? invokeThreadId = null;
 
 		/// <summary>
 		/// Call all pending delegates and invoke their listening thread of their completion afterwards.
 		/// </summary>
 		public void InvokeInvokes() {
+			invokeThreadId = Thread.CurrentThread.ManagedThreadId;
 			Tuple<Action, EventWaitHandle> action;
 			while (invokeQueue.TryDequeue(out action)) {
 				action.Item1.Invoke();
 				action.Item2.Set();
 			}
+			invokeThreadId = null;
 		}
 
 		/// <summary>
@@ -40,6 +43,11 @@ namespace refw {
 		/// </summary>
 		/// <param name="action">delegate to be called by the owning thread</param>
 		public void Invoke(Action action) {
+			// If we're queuing a blocking invoke from inside an action, immediately invoke it to avoid a deadlock
+			if (invokeThreadId.HasValue && invokeThreadId == Thread.CurrentThread.ManagedThreadId) {
+				action.Invoke();
+				return;
+			}
 			var handle = BeginInvoke(action);
 			handle.WaitOne();
 		}

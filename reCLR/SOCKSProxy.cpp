@@ -7,6 +7,7 @@
 #include <cassert>
 #include <map>
 #include <Wininet.h>
+#include <mswsock.h>
 
 #include <msclr\marshal_cppstd.h>
 #include <msclr\marshal.h>
@@ -48,6 +49,7 @@ std::string g_proxyHost;
 int g_proxyPort;
 sockaddr_in g_proxyService;
 bool g_allow_user_pass_auth = false;
+LPFN_CONNECTEX g_ConnectEx;
 std::string g_username;
 std::string g_password;
 std::map<SOCKET, std::shared_ptr<SocknameWrapper>> g_real_peernames;
@@ -74,8 +76,15 @@ int getpeername_hook(SOCKET s, sockaddr *name, int *namelen) {
 	return getpeername(s, name, namelen);
 }
 
-int proxy_negotiate(bool use_wsa_connect, SOCKET s, const sockaddr *name, int namelen, LPWSABUF lpCallerData, LPWSABUF lpCalleeData, LPQOS lpSQOS, LPQOS lpGQOS) {
+enum ConnectFunc {
+	CF_CONNECT, CF_WSACONNECT, CF_CONNECTEX
+};
+
+int proxy_negotiate(ConnectFunc func, SOCKET s, const sockaddr *name, int namelen,
+					LPWSABUF lpCallerData, LPWSABUF lpCalleeData, LPQOS lpSQOS, LPQOS lpGQOS,
+					/*PVOID lpSendBuffer, DWORD dwSendDataLength, */ LPDWORD lpdwBytesSent, LPOVERLAPPED lpOverlapped) {
 	assert(name->sa_family == AF_INET);
+	assert(func == CF_CONNECT || func == CF_WSACONNECT || CF_CONNECTEX);
 	const sockaddr_in* name_in = (const sockaddr_in*)name;
 
 	char* addr_str = inet_ntoa(name_in->sin_addr);
@@ -83,18 +92,14 @@ int proxy_negotiate(bool use_wsa_connect, SOCKET s, const sockaddr *name, int na
 
 	// don't detour localhost loopback
 	if (    name_in->sin_addr.S_un.S_addr == inet_addr("127.0.0.1")
-		|| (name_in->sin_addr.S_un.S_addr == inet_addr(g_proxyHost.c_str()) && port == g_proxyPort)) {
-		if (!use_wsa_connect)
+		|| (name_in->sin_addr.S_un.S_addr == inet_addr(g_proxyHost.c_str()) && port == g_proxyPort)
+		|| name_in->sin_addr.S_un.S_addr == inet_addr("0.0.0.0")) {
+		if (func == CF_CONNECT)
 			return connect(s, name, namelen);
-		else
+		else if (func == CF_WSACONNECT)
 			return WSAConnect(s, name, namelen, lpCallerData, lpCalleeData, lpSQOS, lpGQOS);
-	}
-
-	if (name_in->sin_addr.S_un.S_addr == inet_addr("0.0.0.0")) {
-		if (!use_wsa_connect)
-			return connect(s, name, namelen);
-		else
-			return WSAConnect(s, name, namelen, lpCallerData, lpCalleeData, lpSQOS, lpGQOS);
+		else if (func == CF_CONNECTEX)
+			return g_ConnectEx(s, name, namelen, NULL, 0, lpdwBytesSent, lpOverlapped);
 	}
 
 	unsigned long blocking = 0;
@@ -108,10 +113,20 @@ int proxy_negotiate(bool use_wsa_connect, SOCKET s, const sockaddr *name, int na
 	// you would already know this. We don't, so we have to handle a possible
 	// WSAEWOULDBLOCK
 	while (true) {
-		if (!use_wsa_connect)
+		if (func == CF_CONNECT)
 			error_code = connect(s, (sockaddr*)&g_proxyService, sizeof(g_proxyService));
-		else
+		else if (func == CF_WSACONNECT)
 			error_code = WSAConnect(s, (sockaddr*)&g_proxyService, sizeof(g_proxyService), lpCallerData, lpCalleeData, lpSQOS, lpGQOS);
+		else if (func == CF_CONNECTEX) {
+			bool success = g_ConnectEx(s, (sockaddr*)&g_proxyService, sizeof(g_proxyService), NULL, 0, lpdwBytesSent, lpOverlapped);
+			if (!success && WSAGetLastError() == WSA_IO_PENDING) {
+				DWORD transferred;
+				success = GetOverlappedResult((HANDLE)s, lpOverlapped, &transferred, TRUE);
+				error_code = 0;
+				break;
+			}
+
+		}
 
 		if (error_code != 0) {
 			wsa_error_code = WSAGetLastError();
@@ -277,7 +292,51 @@ int proxy_negotiate(bool use_wsa_connect, SOCKET s, const sockaddr *name, int na
 	return 0;
 }
 
-HINTERNET InternetOpen_hook(LPCTSTR lpszAgent, DWORD dwAccessType, LPCTSTR lpszProxyName, LPCTSTR lpszProxyBypass, DWORD dwFlags) {
+bool PASCAL ConnectEx_wrapper(SOCKET s, const struct sockaddr *name, int namelen, PVOID lpSendBuffer, DWORD dwSendDataLength,
+					   LPDWORD lpdwBytesSent, LPOVERLAPPED lpOverlapped) {
+	//bool result = g_ConnectEx(s, name, namelen, lpSendBuffer, dwSendDataLength, lpdwBytesSent, lpOverlapped);
+	int result = proxy_negotiate(CF_CONNECTEX, s, name, namelen, NULL, NULL, NULL, NULL, lpdwBytesSent, lpOverlapped);
+	if (result != 0)
+		return false;
+
+	if (dwSendDataLength > 0) {
+		WSABUF buf;
+		buf.buf = (CHAR*)lpSendBuffer;
+		buf.len = dwSendDataLength;
+
+		DWORD bytesSent;
+		int result = WSASend(s, &buf, 1, &bytesSent, 0, NULL, NULL);
+		*lpdwBytesSent += bytesSent;
+		return result == 0;
+	}
+
+	WSASetLastError(WSA_IO_PENDING);
+	return false;
+}
+
+int WSAIoctl_hook(SOCKET s, DWORD dwIoControlCode, LPVOID lpvInBuffer, DWORD cbInBuffer, LPVOID lpvOutBuffer, DWORD cbOutBuffer,
+			 LPDWORD lpcbBytesReturned, LPWSAOVERLAPPED lpOverlapped, LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine) {
+	int result = WSAIoctl(s, dwIoControlCode, lpvInBuffer, cbInBuffer, lpvOutBuffer, cbOutBuffer, lpcbBytesReturned, lpOverlapped, lpCompletionRoutine);
+
+	if (result == 0 && dwIoControlCode == SIO_GET_EXTENSION_FUNCTION_POINTER) {
+		GUID guid = WSAID_CONNECTEX;
+		GUID* buffer_guid = (GUID*)lpvInBuffer;
+		if (memcmp(lpvInBuffer, &guid, cbInBuffer) == 0) {
+			// Save original function
+			g_ConnectEx = *(LPFN_CONNECTEX*)lpvOutBuffer;
+			// Return our wrapper
+			*(DWORD*)lpvOutBuffer = (DWORD)&ConnectEx_wrapper;
+		}
+	}
+	return result;
+}
+
+/*SOCKET WSASocket_hook(int af, int type, int protocol, LPWSAPROTOCOL_INFO lpProtocolInfo, GROUP g, DWORD dwFlags) {
+	SOCKET s = WSASocket(af, type, protocol, lpProtocolInfo, g, dwFlags);
+	return s;
+}*/
+
+/*HINTERNET InternetOpen_hook(LPCTSTR lpszAgent, DWORD dwAccessType, LPCTSTR lpszProxyName, LPCTSTR lpszProxyBypass, DWORD dwFlags) {
 	marshal_context context;
 
 	dwAccessType = INTERNET_OPEN_TYPE_PROXY;
@@ -285,22 +344,22 @@ HINTERNET InternetOpen_hook(LPCTSTR lpszAgent, DWORD dwAccessType, LPCTSTR lpszP
 
 	auto inet = InternetOpen(lpszAgent, dwAccessType, context.marshal_as<const char*>(proxy_str), lpszProxyBypass, dwFlags);
 	InternetSetOption(inet, INTERNET_OPTION_PROXY_USERNAME, (void*)g_username.c_str(), g_username.length());
-	InternetSetOption(inet, INTERNET_OPTION_PROXY_PASSWORD, (void*)g_password.c_str(), g_username.length());
+	InternetSetOption(inet, INTERNET_OPTION_PROXY_PASSWORD, (void*)g_password.c_str(), g_password.length());
 
 	return inet;
-}
+}*/
 
 int WSAConnect_hook(SOCKET s, const sockaddr *name, int namelen, LPWSABUF lpCallerData, LPWSABUF lpCalleeData, LPQOS lpSQOS, LPQOS lpGQOS) {
-	return proxy_negotiate(true, s, name, namelen, lpCallerData, lpCalleeData, lpSQOS, lpGQOS);
+	return proxy_negotiate(CF_WSACONNECT, s, name, namelen, lpCallerData, lpCalleeData, lpSQOS, lpGQOS, NULL, NULL);
 }
 
 int connect_hook(SOCKET s, const sockaddr *name, int namelen) {
-	return proxy_negotiate(false, s, name, namelen, NULL, NULL, NULL, NULL);
+	return proxy_negotiate(CF_CONNECT, s, name, namelen, NULL, NULL, NULL, NULL, NULL, NULL);
 }
 
-IntPtr reCLR::Loader::InternetOpenHookWrapper(IntPtr lpszAgent, IntPtr dwAccessType, IntPtr lpszProxyName, IntPtr lpszProxyBypass, IntPtr dwFlags) {
+/*IntPtr reCLR::Loader::InternetOpenHookWrapper(IntPtr lpszAgent, IntPtr dwAccessType, IntPtr lpszProxyName, IntPtr lpszProxyBypass, IntPtr dwFlags) {
 	return (IntPtr)InternetOpen_hook((LPCTSTR)lpszAgent.ToInt32(), (DWORD)dwAccessType.ToInt32(), (LPCTSTR)lpszProxyName.ToInt32(), (LPCTSTR)lpszProxyBypass.ToInt32(), (DWORD)dwFlags.ToInt32());
-}
+}*/
 
 int reCLR::Loader::WSAConnectHookWrapper(IntPtr s, IntPtr name, int namelen, IntPtr lpCallerData, IntPtr lpCalleeData, IntPtr lpSQOS, IntPtr lpGQOS) {
 	return WSAConnect_hook((SOCKET)s.ToInt32(), (sockaddr*)name.ToInt32(), namelen,
@@ -313,6 +372,13 @@ int reCLR::Loader::ConnectHookWrapper(IntPtr s, IntPtr name, int namelen) {
 
 int reCLR::Loader::GetpeernameHookWrapper(IntPtr s, IntPtr name, IntPtr namelen) {
 	return getpeername_hook((SOCKET)s.ToInt32(), (sockaddr*)name.ToInt32(), (int*)namelen.ToPointer());
+}
+
+int reCLR::Loader::WSAIoctlWrapper(IntPtr s, IntPtr dwIoControlCode, IntPtr lpvInBuffer, IntPtr cbInBuffer, IntPtr lpvOutBuffer, IntPtr cbOutBuffer,
+			 IntPtr lpcbBytesReturned, IntPtr lpOverlapped, IntPtr lpCompletionRoutine) {
+	return WSAIoctl_hook((SOCKET)s.ToInt32(), (DWORD)dwIoControlCode.ToInt32(), (LPVOID)lpvInBuffer, (DWORD)cbInBuffer.ToInt32(),
+		(LPVOID)lpvOutBuffer, (DWORD)cbOutBuffer.ToInt32(), (LPDWORD)lpcbBytesReturned.ToInt32(), (LPWSAOVERLAPPED)lpOverlapped.ToInt32(),
+		(LPWSAOVERLAPPED_COMPLETION_ROUTINE)lpCompletionRoutine.ToInt32());
 }
 
 void reCLR::Loader::SetProxy(String^ addr, int port) {

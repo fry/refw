@@ -62,6 +62,8 @@ namespace refw.D3D {
 		/// </summary>
 		public int? FrameLimit = null;
 
+        public uint FrameCounter { get; private set; }
+
 		public void ArtificialEndScene() {
 			long delta_ms = 0;
 			if (FrameLimit.HasValue) {
@@ -71,9 +73,10 @@ namespace refw.D3D {
 				} else {
 					delta_ms = _stopWatch.ElapsedMilliseconds;
 					double diff = 1000.0 / FrameLimit.Value - delta_ms;
-					_timeDiff += diff;
-					if (_timeDiff > 0) {
-						Thread.Sleep((int)_timeDiff);
+					//_timeDiff += diff;
+                    //_timeDiff = Math.Max(0, _timeDiff);
+					if (diff > 0) {
+                        Thread.Sleep((int)diff);
 						_timeDiff = 0;
 					}
 					_stopWatch.Reset();
@@ -89,6 +92,9 @@ namespace refw.D3D {
 
 			if (OnFrame != null)
 				OnFrame(TimeSpan.FromMilliseconds(delta_ms));
+
+            // Increase frame counter with wrap-around
+            FrameCounter = (FrameCounter + 1) % uint.MaxValue;
 		}
 
 		private int EndSceneCallback(IntPtr instance) {
@@ -97,12 +103,16 @@ namespace refw.D3D {
 			return (int)EndScene(instance);
 		}
 
+        public EndSceneDetour() {
+            FrameCounter = 0;
+        }
+
 		/// <summary>
 		/// Start hooking DirectX, this needs to happen during initialization before the process executes.
 		/// </summary>
-		public void SetupDetour() {
+		public void SetupDetour(string dll_name = "d3d9.dll") {
 			// Retrieve Direct3DCreate9 function
-			var lib_d3d9 = EasyHook.NativeAPI.LoadLibrary("d3d9.dll");
+			var lib_d3d9 = EasyHook.NativeAPI.LoadLibrary(dll_name);
 			var create_func = EasyHook.NativeAPI.GetProcAddress(lib_d3d9, "Direct3DCreate9");
 			Direct3DCreate9 = Misc.GetDelegate<NativeAPI.Direct3DCreate9Delegate>(create_func);
 

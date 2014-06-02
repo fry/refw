@@ -53,7 +53,7 @@ static array<String^>^ SplitArgs(String^ command_line) {
 // Dummy helper function for resolving assembly names to fix a .NET bug
 Assembly^ domain_AssemblyResolve(Object^ sender, ResolveEventArgs^ args) {
 	auto parts = args->Name->Split(',');
-  auto file = Path::GetDirectoryName(Assembly::GetExecutingAssembly()->Location) + "\\" + parts[0]->Trim() + ".dll";
+	auto file = Path::GetDirectoryName(Assembly::GetExecutingAssembly()->Location) + "\\" + parts[0]->Trim() + ".dll";
 	return Assembly::LoadFrom(file);
 }
 
@@ -68,6 +68,9 @@ void reCLR::Loader::LoadAssemblyInDomain(String^ assembly_path, String^ assembly
 		app->PrivateBinPath = base_path;
 		app->ShadowCopyFiles = "true";
 
+		// Properly load application's .config file
+		app->ConfigurationFile = Path::Combine(base_path, Path::GetFileName(assembly_path) + ".config");
+
 		// Create a new domain with a random name
 		auto domain_name = gcnew String("refwDomain_") + Guid::NewGuid().ToString();
 		new_domain = AppDomain::CreateDomain(domain_name, nullptr, app);
@@ -79,6 +82,11 @@ void reCLR::Loader::LoadAssemblyInDomain(String^ assembly_path, String^ assembly
 			Assembly::GetExecutingAssembly()->FullName,
 			DomainWorker::typeid->FullName));
 		AppDomain::CurrentDomain->AssemblyResolve -= handler;
+		
+		// Store a reference to our assembly's domain in the DefaultDomain's reCLR::Loader instance.
+		// This is for potential other managed code invoked by native code looking for the injectee's domain.
+		reCLR::Loader::RefwDomain = new_domain;
+
 		// Finally load the assembly inside the domain
 		worker->LoadAssembly(assembly_path, SplitArgs(assembly_args));
 	} finally {
