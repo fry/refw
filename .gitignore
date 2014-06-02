@@ -12,3 +12,7 @@ ipch
 .git_old
 Binaries
 */Debug/
+*/Release/
+test
+test2
+test3
