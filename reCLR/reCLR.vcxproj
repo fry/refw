@@ -82,6 +82,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CLRParameters.h" />
+    <ClInclude Include="DomainReloader.h" />
     <ClInclude Include="DomainWorker.h" />
     <ClInclude Include="reCLR.h" />
   </ItemGroup>
@@ -98,6 +99,11 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\refw.Shared\refw.Shared.csproj">
+      <Project>{2d25e13e-fca2-42e9-8a8b-b9da13e1e859}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

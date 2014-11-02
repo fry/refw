@@ -7,6 +7,14 @@ using namespace System::Windows::Forms;
 namespace reCLR {
 	public ref class DomainWorker: MarshalByRefObject {
 	public:
+		static DomainWorker^ RefwDomainWorker;
+
+		AppDomain^ ParentDomain;
+
+		DomainWorker() {
+			RefwDomainWorker = this;
+		}
+
 		void LoadAssembly(String^ name, array<String^>^ args) {
 			auto ass = Assembly::LoadFrom(name);
 			auto ep = ass->EntryPoint;
@@ -20,6 +28,10 @@ namespace reCLR {
 			} else {
 				throw gcnew ArgumentException(String::Format("Entry point expects an unexpected number of arguments: {0}", arg_count));
 			}
+		}
+
+		void RestoreState(refw::StateCapture^ state) {
+			state->RestoreState();
 		}
 	};
 }

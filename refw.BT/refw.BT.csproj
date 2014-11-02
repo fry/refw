@@ -4,15 +4,13 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{FF77C230-B77D-41DC-9CB6-73058D5A3E54}</ProjectGuid>
+    <ProjectGuid>{0C0096A9-36D8-4E19-B238-8D978F3AE90E}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>refw.Rendering</RootNamespace>
-    <AssemblyName>refw.Rendering</AssemblyName>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <RootNamespace>refw.BT</RootNamespace>
+    <AssemblyName>refw.BT</AssemblyName>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <SkipPostSharp>True</SkipPostSharp>
-    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -30,15 +28,12 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="SlimDX">
-      <HintPath>..\References\SlimDX.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -46,14 +41,49 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Rendering.cs" />
+    <Compile Include="Behavior.cs" />
+    <Compile Include="Composite\Composite.cs" />
+    <Compile Include="Composite\ActiveSelector.cs" />
+    <Compile Include="Composite\Monitor.cs" />
+    <Compile Include="Composite\Parallel.cs" />
+    <Compile Include="Decorator\Decorator.cs" />
+    <Compile Include="Decorator\Inverter.cs" />
+    <Compile Include="Decorator\Repeater.cs" />
+    <Compile Include="Editor\BehaviorPropertyControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Editor\BehaviorPropertyControl.Designer.cs">
+      <DependentUpon>BehaviorPropertyControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Editor\BehaviorTreeConfig.cs" />
+    <Compile Include="Editor\TreeEditor.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Editor\TreeEditor.Designer.cs">
+      <DependentUpon>TreeEditor.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Leaves\Action.cs" />
+    <Compile Include="Decorator\Condition.cs" />
+    <Compile Include="Decorator\IsSet.cs" />
+    <Compile Include="Leaves\Set.cs" />
+    <Compile Include="Leaves\Template.cs" />
+    <Compile Include="Leaves\Wait.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Composite\Selector.cs" />
+    <Compile Include="Composite\Sequence.cs" />
+    <Compile Include="Utility\BasicConfig.cs" />
+    <Compile Include="Utility\BehaviorProperty.cs" />
+    <Compile Include="Utility\BehaviorTemplateAttribute.cs" />
+    <Compile Include="Utility\Blackboard.cs" />
+    <Compile Include="Utility\Policy.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\refw\refw.csproj">
-      <Project>{19bf7432-4278-42b4-8c1f-0d19b25c49d4}</Project>
-      <Name>refw</Name>
-    </ProjectReference>
+    <EmbeddedResource Include="Editor\BehaviorPropertyControl.resx">
+      <DependentUpon>BehaviorPropertyControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Editor\TreeEditor.resx">
+      <DependentUpon>TreeEditor.cs</DependentUpon>
+    </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

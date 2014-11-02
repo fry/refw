@@ -1,4 +1,5 @@
-﻿using SlimDX;
+﻿using System.Drawing;
+using SlimDX;
 using SlimDX.Direct3D9;
 using System;
 using System.Collections.Generic;
@@ -6,6 +7,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using Font = SlimDX.Direct3D9.Font;
 
 namespace refw.Rendering
 {
@@ -30,7 +32,7 @@ namespace refw.Rendering
         protected refw.D3D.EndSceneDetour detour;
 
         private VertexBuffer vb_cube;
-        private Font font;
+        public Font Font;
 
         public abstract class RenderEntry {
             public string Tag;
@@ -84,6 +86,8 @@ namespace refw.Rendering
             return false;
         }
 
+        protected virtual void OnRender() {}
+
         public void Setup(refw.D3D.EndSceneDetour detour) {
             this.detour = detour;
 
@@ -102,12 +106,12 @@ namespace refw.Rendering
                 state_old.Dispose();
                 vb_cube.Dispose();
                 vert_decl_nocolor.Dispose();
-                font.Dispose();
+                Font.Dispose();
                 Device = null;
                 vert_decl_nocolor = null;
                 vb_cube = null;
                 state_old = null;
-                font = null;
+                Font = null;
             }
         }
 
@@ -179,7 +183,7 @@ namespace refw.Rendering
 
             vert_decl_nocolor = new VertexDeclaration(Device, vertexElems);
 
-            font = new Font(Device, new System.Drawing.Font(System.Drawing.FontFamily.GenericSansSerif, 14));
+            Font = new Font(Device, new System.Drawing.Font(System.Drawing.FontFamily.GenericSansSerif, 14));
         }
 
         void DirectX_OnFrame(TimeSpan delta) {
@@ -197,24 +201,31 @@ namespace refw.Rendering
             if (cooplevel.IsFailure)
                 return;
 
-            // Store WoW's render states
+            // Store the game's render states
             state_old.Capture();
 
             var device = Device;
 
+            //device.Clear(ClearFlags.All, Color.Gainsboro, 0, 0);
             // Clean up render states
             device.PixelShader = null;
             device.VertexShader = null;
             device.SetTexture(0, null);
-            device.SetRenderState(RenderState.Lighting, true);
-            device.SetRenderState(RenderState.AlphaBlendEnable, true);
+            device.SetRenderState(RenderState.Lighting, false);
+            device.SetRenderState(RenderState.AlphaBlendEnable, false);
             device.SetRenderState(RenderState.BlendOperation, BlendOperation.Add);
+            var t = device.GetRenderState(RenderState.BlendFactor);
+
+            device.SetRenderState(RenderState.BlendFactor, Color.White.ToArgb());
             device.SetRenderState(RenderState.DestinationBlend, Blend.InverseSourceAlpha);
             device.SetRenderState(RenderState.SourceBlend, Blend.SourceAlpha);
 
             device.SetRenderState(RenderState.CullMode, Cull.None);
             device.SetRenderState(RenderState.ColorWriteEnable, ColorWriteEnable.All);
             device.SetRenderState(RenderState.FillMode, FillMode.Wireframe);
+
+            device.SetRenderState(RenderState.ZEnable, false);
+
 
             Matrix mat_view, mat_proj;
 
@@ -307,11 +318,13 @@ namespace refw.Rendering
                 foreach (var label in Labels) {
                     var transformed = Vector3.Project(label.Position, viewport.X, viewport.Y, viewport.Width, viewport.Height, viewport.MinZ, viewport.MaxZ, viewproj);
                     if (transformed.Z <= 1.0f)
-                        font.DrawString(null, label.Text, (int)transformed.X, (int)transformed.Y, new Color4(label.Color));
+                        Font.DrawString(null, label.Text, (int)transformed.X, (int)transformed.Y, new Color4(label.Color));
                 }
 
                 //device.Material = new Material();
             }
+
+            OnRender();
 
             // Restore render states
             state_old.Apply();

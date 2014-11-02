@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CLRParameters.h"
+#include "DomainWorker.h"
 
 using namespace System;
 
@@ -15,12 +16,16 @@ namespace reCLR {
 	public ref class Loader {
 	public:
 		static AppDomain^ RefwDomain;
+		static String^ LoadedAssemblyPath;
+		static String^ LoadedAssemblyArgs;
 
 		static OnProxyErrorDelegate^ OnProxyError;
-		static void Inject(int process_id, String^ command_line, String^ assembly, String^ assembly_args, bool display_errors, int wakeup_thread_id);
+		static void Inject(int process_id, String^ assembly, String^ assembly_args, bool display_errors, int wakeup_thread_id);
 		static int CreateProcessAndInject(String^ process_name, String^ command_line, String^ assembly, bool display_errors);
 		static int CreateProcessAndInject(String^ process_name, String^ command_line, String^ assembly, String^ assembly_args, bool display_errors);
-		static void LoadAssemblyInDomain(String^ assembly_path, String^ assembly_args);
+		static DomainWorker^ LoadAssemblyInDomain(String^ assembly_path, String^ assembly_args);
+
+		static void UnloadAndReloadDomain();
 
 		//static IntPtr InternetOpenHookWrapper(IntPtr lpszAgent, IntPtr dwAccessType, IntPtr lpszProxyName, IntPtr lpszProxyBypass, IntPtr dwFlags);
 		static int WSAIoctlWrapper(IntPtr s, IntPtr dwIoControlCode, IntPtr lpvInBuffer, IntPtr cbInBuffer, IntPtr lpvOutBuffer, IntPtr cbOutBuffer,
@@ -30,5 +35,7 @@ namespace reCLR {
 		static int GetpeernameHookWrapper(IntPtr s, IntPtr name, IntPtr namelen);
 		static void SetProxy(String^ addr, int port);
 		static void SetProxyAuth(String^ username, String^ password);
+
+		static void test();
 	};
 }

@@ -1,5 +1,6 @@
 #include "reCLR.h"
 #include "DomainWorker.h"
+#include "DomainReloader.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -22,6 +23,7 @@ using namespace System::Windows::Forms;
 using namespace System::Runtime::InteropServices;
 using namespace System::Diagnostics;
 using namespace msclr::interop;
+using namespace refw;
 
 static CLRParameters* clrParams;
 
@@ -57,41 +59,60 @@ Assembly^ domain_AssemblyResolve(Object^ sender, ResolveEventArgs^ args) {
 	return Assembly::LoadFrom(file);
 }
 
-void reCLR::Loader::LoadAssemblyInDomain(String^ assembly_path, String^ assembly_args) {
+reCLR::DomainWorker^ CreateNewDomain(String^ assembly_path) {
 	AppDomain^ new_domain = nullptr;
-	try {
-		auto base_path = Path::GetDirectoryName(assembly_path);
+	auto base_path = Path::GetDirectoryName(assembly_path);
 
-		// Set up domain settings
-		auto app = gcnew AppDomainSetup();
-		app->ApplicationBase = base_path;
-		app->PrivateBinPath = base_path;
-		app->ShadowCopyFiles = "true";
+	// Set up domain settings
+	auto app = gcnew AppDomainSetup();
+	app->ApplicationBase = base_path;
+	app->PrivateBinPath = base_path;
+	app->ShadowCopyFiles = "true";
 
-		// Properly load application's .config file
-		app->ConfigurationFile = Path::Combine(base_path, Path::GetFileName(assembly_path) + ".config");
+	// Properly load application's .config file
+	app->ConfigurationFile = Path::Combine(base_path, Path::GetFileName(assembly_path) + ".config");
 
-		// Create a new domain with a random name
-		auto domain_name = gcnew String("refwDomain_") + Guid::NewGuid().ToString();
-		new_domain = AppDomain::CreateDomain(domain_name, nullptr, app);
-		// Create a DomainWorker class inside the new domain to load our assembly through.
-		// This way the newly loaded assembly will appear inside the new domain
-		auto handler = gcnew ResolveEventHandler(domain_AssemblyResolve);
-		AppDomain::CurrentDomain->AssemblyResolve += handler;
-		auto worker = (DomainWorker^)(new_domain->CreateInstanceAndUnwrap(
-			Assembly::GetExecutingAssembly()->FullName,
-			DomainWorker::typeid->FullName));
-		AppDomain::CurrentDomain->AssemblyResolve -= handler;
+	// Create a new domain with a random name
+	auto domain_name = gcnew String("refwDomain_") + Guid::NewGuid().ToString();
+	new_domain = AppDomain::CreateDomain(domain_name, nullptr, app);
+	// Create a DomainWorker class inside the new domain to load our assembly through.
+	// This way the newly loaded assembly will appear inside the new domain
 		
-		// Store a reference to our assembly's domain in the DefaultDomain's reCLR::Loader instance.
-		// This is for potential other managed code invoked by native code looking for the injectee's domain.
-		reCLR::Loader::RefwDomain = new_domain;
+	auto worker = (reCLR::DomainWorker^)(new_domain->CreateInstanceAndUnwrap(
+		Assembly::GetExecutingAssembly()->FullName,
+		reCLR::DomainWorker::typeid->FullName));
+	worker->ParentDomain = AppDomain::CurrentDomain;
 
-		// Finally load the assembly inside the domain
-		worker->LoadAssembly(assembly_path, SplitArgs(assembly_args));
-	} finally {
-		//if (new_domain != nullptr)
-		//	AppDomain::Unload(new_domain);
+	// Store a reference to our assembly's domain in the DefaultDomain's reCLR::Loader instance.
+	// This is for potential other managed code invoked by native code looking for the injectee's domain.
+	reCLR::Loader::RefwDomain = new_domain;
+
+	return worker;
+}
+
+reCLR::DomainWorker^ reCLR::Loader::LoadAssemblyInDomain(String^ assembly_path, String^ assembly_args) {
+	auto worker = CreateNewDomain(assembly_path);
+
+	reCLR::Loader::LoadedAssemblyPath = assembly_path;
+	reCLR::Loader::LoadedAssemblyArgs = assembly_args;
+	// Finally load the assembly inside the domain
+	worker->LoadAssembly(assembly_path, SplitArgs(assembly_args));
+	return worker;
+}
+
+void reCLR::Loader::test() {
+	auto test = AppDomain::CurrentDomain->IsDefaultAppDomain();
+	MessageBox::Show("test" + test.ToString());
+}
+
+void reCLR::Loader::UnloadAndReloadDomain() {
+	auto worker = DomainWorker::RefwDomainWorker;
+	if (worker != nullptr) {
+		auto state = StateCapture::CaptureState();
+
+		auto reloader = gcnew DomainReloader(state);
+		worker->ParentDomain->DoCallBack(gcnew CrossAppDomainDelegate(reloader, &reCLR::DomainReloader::Reload));
+		return;
 	}
 }
 
@@ -99,6 +120,9 @@ void ThreadInitialize() {
 	// Determine location of the current assembly
 	//auto this_path = Path::GetDirectoryName(Assembly::GetExecutingAssembly()->Location);
 	try {
+		auto handler = gcnew ResolveEventHandler(domain_AssemblyResolve);
+		AppDomain::CurrentDomain->AssemblyResolve += handler;
+
 		// And build the full path to the assembly to load relative to that
 		auto launch_assembly = gcnew String(clrParams->DotNetFile);
 		auto assembly_args = gcnew String(clrParams->DotNetArgs);
@@ -272,11 +296,11 @@ int reCLR::Loader::CreateProcessAndInject(String^ process_name, String^ command_
 		throw gcnew InvalidOperationException(String::Format("Failed to create process {0}, error code {1}", process_name, error_code));
 	}
 
-	reCLR::Loader::Inject(pi.dwProcessId, command_line, assembly, assembly_args, display_errors, pi.dwThreadId);
+	reCLR::Loader::Inject(pi.dwProcessId, assembly, assembly_args, display_errors, pi.dwThreadId);
 	return pi.dwProcessId;
 }
 
-void reCLR::Loader::Inject(int process_id, String^ command_line, String^ assembly, String^ assembly_args, bool display_errors, int wakeup_thread_id) {
+void reCLR::Loader::Inject(int process_id, String^ assembly, String^ assembly_args, bool display_errors, int wakeup_thread_id) {
 	// Expand assembly name if it points to a library
 	if (File::Exists(assembly))
 		assembly = Path::GetFullPath(assembly);
