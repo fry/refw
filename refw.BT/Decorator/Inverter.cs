@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace refw.BT {
     public class Inverter: Decorator {
         protected override Status Update(Blackboard blackboard) {
-            var result = Child.Tick(blackboard);
+            var result = Child.TickUpdate(blackboard);
 
             if (result == Status.Failure)
                 return Status.Success;

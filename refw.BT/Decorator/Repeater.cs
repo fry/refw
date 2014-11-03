@@ -5,13 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace refw.BT {
-    public enum RepeatPolicy {
-        UntilSuccess,
-        UntilFailure
-    }
-
     public class Repeater: Decorator {
-        public RepeatPolicy RepeatPolicy = RepeatPolicy.UntilFailure;
         public BehaviorProperty<int> Count = null;
         
         private int? currentCount = null;
@@ -26,13 +20,7 @@ namespace refw.BT {
                     return Status.Success;
             }
             
-            var result = Child.Tick(blackboard);
-
-            // Succeed depending on the repeat policy
-            if (RepeatPolicy == RepeatPolicy.UntilFailure && result == Status.Failure)
-                return Status.Success;
-            else if (RepeatPolicy == RepeatPolicy.UntilSuccess && result == Status.Success)
-                return Status.Success;
+            var result = Child.TickUpdate(blackboard);
 
             // Decrement counter, if set, otherwise
             if (currentCount.HasValue)

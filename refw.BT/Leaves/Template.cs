@@ -14,7 +14,7 @@ namespace refw.BT {
         }
 
         protected override Status Update(Blackboard blackboard) {
-            return Child.Tick(blackboard);
+            return Child.TickUpdate(blackboard);
         }
     }
 }

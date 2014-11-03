@@ -12,7 +12,10 @@ namespace refw.BT
         Invalid,
         Success,
         Failure,
-        Running
+        Aborted,
+
+        Running,
+        Aborting,
     }
 
     public enum RepeatMode {
@@ -26,30 +29,43 @@ namespace refw.BT
         public Status Status { get; protected set; }
         public RepeatMode RepeatMode { get; set; }
 
-        public Behavior() {
+        protected Behavior() {
             RepeatMode = RepeatMode.Never;
             Status = Status.Invalid;
         }
 
+        /// <summary>
+        /// Execute the node, should return Success, Failure or Running
+        /// </summary>
+        /// <param name="blackboard"></param>
+        /// <returns></returns>
         protected abstract Status Update(Blackboard blackboard);
+
+        protected virtual Status Abort(Blackboard blackboard) {
+            // Default behavior on abort is to reset the node
+            Reset();
+            return Status.Aborted;
+        }
 
         protected virtual void OnInitialize(Blackboard blackboard) { }
         protected virtual void OnTerminate(Status status) { }
         
-        [DebuggerStepThrough]
-        public Status Tick(Blackboard blackboard) {
-            if (Status != Status.Running)
+        //[DebuggerStepThrough]
+        public Status TickUpdate(Blackboard blackboard) {
+            if (!IsRunning) {
                 OnInitialize(blackboard);
+            }
 
             Status = Update(blackboard);
 
-            if (Status != Status.Running)
+            if (!IsRunning) {
                 OnTerminate(Status);
+            }
 
             // Repeat until failure, until success or forever
             if (RepeatMode == RepeatMode.UntilFailure && Status == Status.Success
                 || RepeatMode == RepeatMode.UntilSuccess && Status == Status.Failure
-                || RepeatMode == RepeatMode.Forever && Status != Status.Running) {
+                || RepeatMode == RepeatMode.Forever && !IsRunning) {
                 Reset();
                 return Status.Running;
             }
@@ -57,23 +73,25 @@ namespace refw.BT
             return Status;
         }
 
-        public void Reset() {
-            // Node is reset in the middle of execution, trigger clean-up
-            if (Status != Status.Invalid)
-                OnTerminate(Status);
+        public Status TickAbort(Blackboard blackboard) {
+            if (!IsFinished)
+                Status = Abort(blackboard);
+            return Status;
+        }
 
+        public void Reset() {
             Status = Status.Invalid;
         }
 
         public bool IsFinished {
             get {
-                return Status == Status.Success || Status == Status.Failure;
+                return Status == Status.Success || Status == Status.Failure || Status == Status.Aborted;
             }
         }
 
         public bool IsRunning {
             get {
-                return Status == Status.Running;
+                return Status == Status.Running || Status == Status.Aborting;
             }
         }
 

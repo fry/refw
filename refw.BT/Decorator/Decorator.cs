@@ -8,11 +8,6 @@ namespace refw.BT {
     public abstract class Decorator: Behavior {
         public List<Behavior> Children = new List<Behavior>();
 
-        protected override void OnTerminate(Status status) {
-            //if (Children.Count > 0)
-            //    Children[0].Reset();
-        }
-
         public Behavior Child {
             get {
                 return Children.Count > 0 ? Children[0] : null;
@@ -30,6 +25,12 @@ namespace refw.BT {
 
         public override List<Behavior> GetChildren() {
             return Children;
+        }
+
+        protected override Status Abort(Blackboard blackboard) {
+            if (Child == null)
+                return Status.Aborted;
+            return Child.TickAbort(blackboard);
         }
     }
 }

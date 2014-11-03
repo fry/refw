@@ -9,12 +9,16 @@ namespace refw.BT {
         public BehaviorProperty<bool> Predicate = null;
 
         protected override Status Update(Blackboard blackboard) {
-            if (Predicate.GetValue(blackboard)) {
+            if (CheckPredicate(blackboard)) {
                 if (Child != null)
-                    return Child.Tick(blackboard);
+                    return Child.TickUpdate(blackboard);
                 return Status.Success;
             }
             return Status.Failure;
+        }
+
+        public bool CheckPredicate(Blackboard blackboard) {
+            return Predicate.GetValue(blackboard);
         }
     }
 }

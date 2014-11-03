@@ -16,7 +16,7 @@ namespace refw.BT {
 
         protected override Status Update(Blackboard blackboard) {
             while (true) {
-                var status = CurrentChild.Current.Tick(blackboard);
+                var status = CurrentChild.Current.TickUpdate(blackboard);
 
                 if (status != Status.Success)
                     return status;
@@ -24,6 +24,13 @@ namespace refw.BT {
                 if (!CurrentChild.MoveNext())
                     return Status.Success;
             }
+        }
+
+        protected override Status Abort(Blackboard blackboard) {
+            Status = CurrentChild.Current.TickAbort(blackboard);
+            if (Status == Status.Aborted)
+                Reset();
+            return Status;
         }
     }
 }

@@ -44,7 +44,6 @@
     <Compile Include="Behavior.cs" />
     <Compile Include="Composite\Composite.cs" />
     <Compile Include="Composite\ActiveSelector.cs" />
-    <Compile Include="Composite\Monitor.cs" />
     <Compile Include="Composite\Parallel.cs" />
     <Compile Include="Decorator\Decorator.cs" />
     <Compile Include="Decorator\Inverter.cs" />
