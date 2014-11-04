@@ -12,6 +12,8 @@ namespace refw.BT {
             if (Predicate == null) {
                 Predicate = BehaviorProperty<bool>.Func(bb => bb.Contains(Source) && bb.Get<object>(Source) != null);
             }
+
+            base.OnInitialize(blackboard);
         }
     }
 }

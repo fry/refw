@@ -1,0 +1,145 @@
+[1mdiff --git a/Test/Form1.cs b/Test/Form1.cs[m
+[1mindex c2a843d..4a2a3f2 100644[m
+[1m--- a/Test/Form1.cs[m
+[1m+++ b/Test/Form1.cs[m
+[36m@@ -7,11 +7,13 @@[m [musing System.Linq;[m
+ using System.Text;[m
+ using System.Windows.Forms;[m
+ using refw;[m
+[32m+[m[32musing System.Reflection;[m
+ [m
+ namespace Test {[m
+ 	public partial class Form1: Form {[m
+ 		public Form1() {[m
+ 			InitializeComponent();[m
+[32m+[m			[32mMessageBox.Show(AppDomain.CurrentDomain.FriendlyName);[m
+ 			refw.Loader.WakeUpProcess();[m
+ 		}[m
+ 	}[m
+[1mdiff --git a/Test/Program.cs b/Test/Program.cs[m
+[1mindex e372316..e91fb38 100644[m
+[1m--- a/Test/Program.cs[m
+[1m+++ b/Test/Program.cs[m
+[36m@@ -14,8 +14,6 @@[m [mnamespace Test {[m
+ 			Application.EnableVisualStyles();[m
+ 			Application.SetCompatibleTextRenderingDefault(false);[m
+ 			Application.Run(new Form1());[m
+[31m-[m
+[31m-			[m
+ 		}[m
+ 	}[m
+ }[m
+[1mdiff --git a/reCLR/reCLR.cpp b/reCLR/reCLR.cpp[m
+[1mindex 4c21abc..2c610be 100644[m
+[1m--- a/reCLR/reCLR.cpp[m
+[1m+++ b/reCLR/reCLR.cpp[m
+[36m@@ -1,4 +1,5 @@[m
+ #include "reCLR.h"[m
+[32m+[m[32m#include "DomainWorker.h"[m
+ [m
+ #define WIN32_LEAN_AND_MEAN[m
+ #include <windows.h>[m
+[36m@@ -18,10 +19,48 @@[m [musing namespace System::IO;[m
+ using namespace System::Threading;[m
+ using namespace System::Windows::Forms;[m
+ using namespace System::Runtime::InteropServices;[m
+[32m+[m[32musing namespace System::Diagnostics;[m
+ using namespace msclr::interop;[m
+ [m
+ static CLRParameters* clrParams;[m
+ [m
+[32m+[m[32m// Dummy helper function for resolving assembly names to fix a .NET bug[m
+[32m+[m[32mAssembly^ domain_AssemblyResolve(Object^ sender, ResolveEventArgs^ args) {[m
+[32m+[m	[32mauto parts = args->Name->Split(',');[m
+[32m+[m[32m  auto file = Path::GetDirectoryName(Assembly::GetExecutingAssembly()->Location) + "\\" + parts[0]->Trim() + ".dll";[m
+[32m+[m	[32mreturn Assembly::LoadFrom(file);[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mvoid reCLR::Loader::LoadAssemblyInDomain(String^ assembly_path) {[m
+[32m+[m	[32mAppDomain^ new_domain = nullptr;[m
+[32m+[m	[32mtry {[m
+[32m+[m		[32mauto base_path = Path::GetDirectoryName(assembly_path);[m
+[32m+[m
+[32m+[m		[32m// Set up domain settings[m
+[32m+[m		[32mauto app = gcnew AppDomainSetup();[m
+[32m+[m		[32mapp->ApplicationBase = base_path;[m
+[32m+[m		[32mapp->PrivateBinPath = base_path;[m
+[32m+[m		[32mapp->ShadowCopyFiles = "true";[m
+[32m+[m
+[32m+[m		[32m// Create a new domain with a random name[m
+[32m+[m		[32mauto domain_name = gcnew String("refwDomain_") + Guid::NewGuid().ToString();[m
+[32m+[m		[32mnew_domain = AppDomain::CreateDomain(domain_name, nullptr, app);[m
+[32m+[m		[32m// Create a DomainWorker class inside the new domain to load our assembly through.[m
+[32m+[m		[32m// This way the newly loaded assembly will appear inside the new domain[m
+[32m+[m		[32mauto handler = gcnew ResolveEventHandler(domain_AssemblyResolve);[m
+[32m+[m		[32mAppDomain::CurrentDomain->AssemblyResolve += handler;[m
+[32m+[m		[32mauto worker = (DomainWorker^)(new_domain->CreateInstanceAndUnwrap([m
+[32m+[m			[32mAssembly::GetExecutingAssembly()->FullName,[m
+[32m+[m			[32mDomainWorker::typeid->FullName));[m
+[32m+[m		[32mAppDomain::CurrentDomain->AssemblyResolve -= handler;[m
+[32m+[m		[32m// Finally load the assembly inside the domain[m
+[32m+[m		[32mworker->LoadAssembly(assembly_path);[m
+[32m+[m	[32m} finally {[m
+[32m+[m		[32m//if (new_domain != nullptr)[m
+[32m+[m		[32m//	AppDomain::Unload(new_domain);[m
+[32m+[m	[32m}[m
+[32m+[m[32m}[m
+[32m+[m
+ void ThreadInitialize() {[m
+ 	// Determine location of the current assembly[m
+ 	//auto this_path = Path::GetDirectoryName(Assembly::GetExecutingAssembly()->Location);[m
+[36m@@ -29,9 +68,7 @@[m [mvoid ThreadInitialize() {[m
+ 		// And build the full path to the assembly to load relative to that[m
+ 		auto launch_assembly = gcnew String(clrParams->DotNetFile);[m
+ 		// Load the assembly and invoke the entry point[m
+[31m-		auto assembly = Assembly::LoadFrom(launch_assembly);[m
+[31m-		auto entry_point = assembly->EntryPoint;[m
+[31m-		entry_point->Invoke(nullptr, nullptr);[m
+[32m+[m		[32mreCLR::Loader::LoadAssemblyInDomain(launch_assembly);[m
+ 	} catch (Exception^ e) {[m
+ 		if (clrParams->DisplayErrors)[m
+ 			MessageBox::Show(e->ToString());[m
+[1mdiff --git a/reCLR/reCLR.h b/reCLR/reCLR.h[m
+[1mindex ae8bcef..36a7571 100644[m
+[1m--- a/reCLR/reCLR.h[m
+[1m+++ b/reCLR/reCLR.h[m
+[36m@@ -8,5 +8,6 @@[m [mnamespace reCLR {[m
+ 	public ref class Loader {[m
+ 	public:[m
+ 		static void CreateProcessAndInject(String^ process_name, String^ command_line, String^ assembly, bool display_errors);[m
+[32m+[m		[32mstatic void LoadAssemblyInDomain(String^ assembly_path);[m
+ 	};[m
+ }[m
+[1mdiff --git a/reCLR/reCLR.vcxproj b/reCLR/reCLR.vcxproj[m
+[1mindex ab5746f..b9e0826 100644[m
+[1m--- a/reCLR/reCLR.vcxproj[m
+[1m+++ b/reCLR/reCLR.vcxproj[m
+[36m@@ -82,6 +82,7 @@[m
+   </ItemGroup>[m
+   <ItemGroup>[m
+     <ClInclude Include="CLRParameters.h" />[m
+[32m+[m[32m    <ClInclude Include="DomainWorker.h" />[m
+     <ClInclude Include="reCLR.h" />[m
+   </ItemGroup>[m
+   <ItemGroup>[m
+[1mdiff --git a/reCLR/reCLR.vcxproj.filters b/reCLR/reCLR.vcxproj.filters[m
+[1mindex 9d8725f..2a32c70 100644[m
+[1m--- a/reCLR/reCLR.vcxproj.filters[m
+[1m+++ b/reCLR/reCLR.vcxproj.filters[m
+[36m@@ -17,6 +17,9 @@[m
+     <ClInclude Include="CLRParameters.h">[m
+       <Filter>Header Files</Filter>[m
+     </ClInclude>[m
+[32m+[m[32m    <ClInclude Include="DomainWorker.h">[m
+[32m+[m[32m      <Filter>Header Files</Filter>[m
+[32m+[m[32m    </ClInclude>[m
+   </ItemGroup>[m
+   <ItemGroup>[m
+     <ClCompile Include="reCLR.cpp">[m
+[1mdiff --git a/refw.sln b/refw.sln[m
+[1mindex 40393d5..8a2a603 100644[m
+[1m--- a/refw.sln[m
+[1m+++ b/refw.sln[m
+[36m@@ -3,8 +3,6 @@[m [mMicrosoft Visual Studio Solution File, Format Version 11.00[m
+ # Visual Studio 2010[m
+ Project("{8BC9CEB8-8B4A-11D0

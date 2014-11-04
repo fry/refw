@@ -45,6 +45,8 @@
     <Compile Include="Composite\Composite.cs" />
     <Compile Include="Composite\ActiveSelector.cs" />
     <Compile Include="Composite\Parallel.cs" />
+    <Compile Include="Decorator\Atomic.cs" />
+    <Compile Include="Decorator\SetAndCheck.cs" />
     <Compile Include="Decorator\Decorator.cs" />
     <Compile Include="Decorator\Inverter.cs" />
     <Compile Include="Decorator\Repeater.cs" />
@@ -55,6 +57,12 @@
       <DependentUpon>BehaviorPropertyControl.cs</DependentUpon>
     </Compile>
     <Compile Include="Editor\BehaviorTreeConfig.cs" />
+    <Compile Include="Editor\BehaviorTreeMonitor.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Editor\BehaviorTreeMonitor.Designer.cs">
+      <DependentUpon>BehaviorTreeMonitor.cs</DependentUpon>
+    </Compile>
     <Compile Include="Editor\TreeEditor.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -79,6 +87,9 @@
   <ItemGroup>
     <EmbeddedResource Include="Editor\BehaviorPropertyControl.resx">
       <DependentUpon>BehaviorPropertyControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Editor\BehaviorTreeMonitor.resx">
+      <DependentUpon>BehaviorTreeMonitor.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Editor\TreeEditor.resx">
       <DependentUpon>TreeEditor.cs</DependentUpon>

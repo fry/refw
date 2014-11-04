@@ -23,8 +23,7 @@ namespace refw.BT {
             // if so, it becomes our new current child
             for (int i = 0; i < currentChild; i++) {
                 var child = Children[i];
-                var can_run = (child is Condition) && ((Condition) child).CheckPredicate(blackboard);
-                if (can_run) {
+                if (child.CheckCondition(blackboard)) {
                     // Attempt to abort the child, and yield if it can't abort yet
                     var current = Children[currentChild];
                     if (current.TickAbort(blackboard) != Status.Aborted)
@@ -54,6 +53,15 @@ namespace refw.BT {
             if (Status == Status.Aborted)
                 Reset();
             return Status;
+        }
+
+        public override bool CheckCondition(Blackboard blackboard) {
+            foreach (var child in Children) {
+                if (child.CheckCondition(blackboard))
+                    return true;
+            }
+
+            return false;
         }
     }
 }

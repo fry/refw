@@ -32,5 +32,9 @@ namespace refw.BT {
                 return Status.Aborted;
             return Child.TickAbort(blackboard);
         }
+
+        public override bool CheckCondition(Blackboard blackboard) {
+            return Child != null && Child.CheckCondition(blackboard);
+        }
     }
 }

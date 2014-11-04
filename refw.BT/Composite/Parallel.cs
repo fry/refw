@@ -48,7 +48,7 @@ namespace refw.BT {
             // Abort all children
             int aborting_count = 0;
             foreach (var child in Children) {
-                var status = child.IsFinished ? child.Status : child.TickAbort(blackboard);
+                var status = (child.IsFinished || child.Status == Status.Invalid) ? child.Status : child.TickAbort(blackboard);
                 if (status == Status.Aborting)
                     aborting_count++;
             }
@@ -57,6 +57,33 @@ namespace refw.BT {
                 return Status.Aborting;
 
             return Status.Aborted;
+        }
+
+        public override bool CheckCondition(Blackboard blackboard) {
+            var success_count = 0;
+            var failure_count = 0;
+
+            foreach (var child in Children) {
+                var result = child.CheckCondition(blackboard);
+                if (!result) {
+                    failure_count ++;
+                    if (FailurePolicy == Policy.One)
+                        return false;
+                } else {
+                    success_count++;
+                    if (SuccessPolicy == Policy.One)
+                        return true;
+                }
+            }
+
+            // Succeed/Fail depending on Policy.All
+            if (FailurePolicy == Policy.All && failure_count == Children.Count)
+                return false;
+
+            if (SuccessPolicy == Policy.All && success_count == Children.Count)
+                return true;
+
+            return true;
         }
     }
 }

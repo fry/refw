@@ -28,9 +28,16 @@ namespace refw.BT {
 
         protected override Status Abort(Blackboard blackboard) {
             Status = CurrentChild.Current.TickAbort(blackboard);
-            if (Status == Status.Aborted)
-                Reset();
             return Status;
+        }
+
+        public override bool CheckCondition(Blackboard blackboard) {
+            foreach (var child in Children) {
+                if (child.CheckCondition(blackboard))
+                    return true;
+            }
+
+            return false;
         }
     }
 }

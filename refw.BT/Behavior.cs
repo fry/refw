@@ -76,6 +76,10 @@ namespace refw.BT
         public Status TickAbort(Blackboard blackboard) {
             if (!IsFinished)
                 Status = Abort(blackboard);
+
+            if (!IsRunning)
+                OnTerminate(Status);
+
             return Status;
         }
 
@@ -95,12 +99,16 @@ namespace refw.BT
             }
         }
 
+        public virtual bool CheckCondition(Blackboard blackboard) {
+            return false;
+        }
+
         public virtual int GetMaxChildren() {
             return 0;
         }
 
         public virtual List<Behavior> GetChildren() {
-            return null;
+            return new List<Behavior>();
         }
 
         public IEnumerable<FieldInfo> GetBehaviorProperties() {
