@@ -23,7 +23,19 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "refw.BT", "refw.BT\refw.BT.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "refw.BT.Editor", "refw.BT.Editor\refw.BT.Editor.csproj", "{94645513-D1F6-4A0A-BB56-DCCB5D93494A}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Misc", "Misc", "{B1752454-3376-473C-9FC1-25E827AB915C}"
+	ProjectSection(SolutionItems) = preProject
+		EasyHook\EasyHook.dll = EasyHook\EasyHook.dll
+		EasyHook\EasyHook.XML = EasyHook\EasyHook.XML
+		EasyHook\EasyHook32.dll = EasyHook\EasyHook32.dll
+		References\SlimDX.dll = References\SlimDX.dll
+	EndProjectSection
+EndProject
 Global
+	GlobalSection(SubversionScc) = preSolution
+		Svn-Managed = True
+		Manager = AnkhSVN - Subversion Support for Visual Studio
+	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Debug|Mixed Platforms = Debug|Mixed Platforms

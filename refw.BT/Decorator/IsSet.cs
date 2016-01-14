@@ -5,15 +5,12 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace refw.BT {
+    [DefaultBehavior]
     public class IsSet: Condition {
         public string Source;
 
-        protected override void OnInitialize(Blackboard blackboard) {
-            if (Predicate == null) {
-                Predicate = BehaviorProperty<bool>.Func(bb => bb.Contains(Source) && bb.Get<object>(Source) != null);
-            }
-
-            base.OnInitialize(blackboard);
+        public IsSet() {
+            Predicate = BehaviorProperty<bool>.Func(bb => bb.Contains(Source) && bb.Get<object>(Source) != null);
         }
     }
 }

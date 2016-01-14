@@ -1,4 +1,5 @@
 #include "reCLR.h"
+#include "ProxySettingsRetriever.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <Winsock2.h>
@@ -8,6 +9,7 @@
 #include <map>
 #include <Wininet.h>
 #include <mswsock.h>
+#include <Ws2ipdef.h>
 
 #include <msclr\marshal_cppstd.h>
 #include <msclr\marshal.h>
@@ -54,6 +56,11 @@ std::string g_username;
 std::string g_password;
 std::map<SOCKET, std::shared_ptr<SocknameWrapper>> g_real_peernames;
 
+bool IsProxyEnabled() {
+	auto p = (reCLR::ProxySettingsRetriever^)reCLR::Loader::RefwDomain->CreateInstanceAndUnwrap("reCLR", "reCLR.ProxySettingsRetriever");
+	return p->IsEnabled();
+}
+
 int getpeername_hook(SOCKET s, sockaddr *name, int *namelen) {
 	auto iter = g_real_peernames.find(s);
 	if (iter != g_real_peernames.end()) {
@@ -80,20 +87,27 @@ enum ConnectFunc {
 	CF_CONNECT, CF_WSACONNECT, CF_CONNECTEX
 };
 
+bool is_whitelisted(const sockaddr* name) {
+	if (name->sa_family == AF_INET) {
+		const sockaddr_in* name_in = (const sockaddr_in*)name;
+		return name_in->sin_addr.S_un.S_addr == inet_addr("127.0.0.1")
+		|| (name_in->sin_addr.S_un.S_addr == inet_addr(g_proxyHost.c_str()))
+		|| name_in->sin_addr.S_un.S_addr == inet_addr("0.0.0.0");
+	} else if (name->sa_family == AF_INET6) {
+		const sockaddr_in6* name_in6 = (const sockaddr_in6*)name;
+		if (IN6_IS_ADDR_LOOPBACK(&name_in6->sin6_addr))
+			return true;
+	}
+
+	return false;
+}
+
 int proxy_negotiate(ConnectFunc func, SOCKET s, const sockaddr *name, int namelen,
 					LPWSABUF lpCallerData, LPWSABUF lpCalleeData, LPQOS lpSQOS, LPQOS lpGQOS,
 					/*PVOID lpSendBuffer, DWORD dwSendDataLength, */ LPDWORD lpdwBytesSent, LPOVERLAPPED lpOverlapped) {
-	assert(name->sa_family == AF_INET);
-	assert(func == CF_CONNECT || func == CF_WSACONNECT || CF_CONNECTEX);
-	const sockaddr_in* name_in = (const sockaddr_in*)name;
+	assert(func == CF_CONNECT || func == CF_WSACONNECT || func == CF_CONNECTEX);
 
-	char* addr_str = inet_ntoa(name_in->sin_addr);
-	unsigned short port = ntohs(name_in->sin_port);
-
-	// don't detour localhost loopback
-	if (    name_in->sin_addr.S_un.S_addr == inet_addr("127.0.0.1")
-		|| (name_in->sin_addr.S_un.S_addr == inet_addr(g_proxyHost.c_str()) && port == g_proxyPort)
-		|| name_in->sin_addr.S_un.S_addr == inet_addr("0.0.0.0")) {
+	if (is_whitelisted(name)) {
 		if (func == CF_CONNECT)
 			return connect(s, name, namelen);
 		else if (func == CF_WSACONNECT)
@@ -101,6 +115,12 @@ int proxy_negotiate(ConnectFunc func, SOCKET s, const sockaddr *name, int namele
 		else if (func == CF_CONNECTEX)
 			return g_ConnectEx(s, name, namelen, NULL, 0, lpdwBytesSent, lpOverlapped);
 	}
+
+	assert(name->sa_family == AF_INET);
+	const sockaddr_in* name_in = (const sockaddr_in*)name;
+
+	char* addr_str = inet_ntoa(name_in->sin_addr);
+	unsigned short port = ntohs(name_in->sin_port);
 
 	unsigned long blocking = 0;
 
@@ -119,10 +139,14 @@ int proxy_negotiate(ConnectFunc func, SOCKET s, const sockaddr *name, int namele
 			error_code = WSAConnect(s, (sockaddr*)&g_proxyService, sizeof(g_proxyService), lpCallerData, lpCalleeData, lpSQOS, lpGQOS);
 		else if (func == CF_CONNECTEX) {
 			bool success = g_ConnectEx(s, (sockaddr*)&g_proxyService, sizeof(g_proxyService), NULL, 0, lpdwBytesSent, lpOverlapped);
-			if (!success && WSAGetLastError() == WSA_IO_PENDING) {
-				DWORD transferred;
-				success = GetOverlappedResult((HANDLE)s, lpOverlapped, &transferred, TRUE);
-				error_code = 0;
+			if (!success) {
+				error_code = WSAGetLastError();
+				if (error_code == WSA_IO_PENDING) {
+					DWORD transferred, flags;
+					//success = WSAGetOverlappedResult(s, lpOverlapped, &transferred, TRUE, &flags);
+					error_code = 0;
+					break;
+				}
 				break;
 			}
 
@@ -179,6 +203,7 @@ int proxy_negotiate(ConnectFunc func, SOCKET s, const sockaddr *name, int namele
 	error_code = recv(s, (char*)&server_choice_packet, sizeof(ServerChoicePacket), MSG_WAITALL);
 
 	if (error_code == SOCKET_ERROR) {
+		auto wsa_error_code = WSAGetLastError();
 		if (reCLR::Loader::OnProxyError != nullptr)
 			reCLR::Loader::OnProxyError(reCLR::ProxyErrorType::ConnectFailed, "Recv 1 failed");
 		WSASetLastError(WSAENETDOWN);
@@ -294,7 +319,10 @@ int proxy_negotiate(ConnectFunc func, SOCKET s, const sockaddr *name, int namele
 
 bool PASCAL ConnectEx_wrapper(SOCKET s, const struct sockaddr *name, int namelen, PVOID lpSendBuffer, DWORD dwSendDataLength,
 					   LPDWORD lpdwBytesSent, LPOVERLAPPED lpOverlapped) {
-	//bool result = g_ConnectEx(s, name, namelen, lpSendBuffer, dwSendDataLength, lpdwBytesSent, lpOverlapped);
+
+	if (!IsProxyEnabled())
+		return g_ConnectEx(s, name, namelen, lpSendBuffer, dwSendDataLength, lpdwBytesSent, lpOverlapped);
+
 	int result = proxy_negotiate(CF_CONNECTEX, s, name, namelen, NULL, NULL, NULL, NULL, lpdwBytesSent, lpOverlapped);
 	if (result != 0)
 		return false;

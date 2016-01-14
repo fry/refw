@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace refw.BT {
+    [DefaultBehavior]
     public class Inverter: Decorator {
         protected override Status Update(Blackboard blackboard) {
             var result = Child.TickUpdate(blackboard);
@@ -15,6 +16,10 @@ namespace refw.BT {
                 return Status.Failure;
 
             return result;
+        }
+
+        public override bool CheckCondition(Blackboard blackboard) {
+            return !base.CheckCondition(blackboard);
         }
     }
 }

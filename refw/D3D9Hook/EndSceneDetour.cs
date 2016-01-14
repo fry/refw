@@ -61,6 +61,7 @@ namespace refw.D3D {
 		/// If set, limits the frames per second to the set value.
 		/// </summary>
 		public int? FrameLimit = null;
+	    public NativeAPI.Point? EnforceWindowSize = null;
 
         public uint FrameCounter { get; private set; }
 
@@ -172,6 +173,7 @@ namespace refw.D3D {
 			} catch (Exception e) {
 				MessageBox.Show(e.ToString());
 			}
+
 			return result;
 		}
 
@@ -179,7 +181,8 @@ namespace refw.D3D {
 			if (OnResetDevice != null)
 				OnResetDevice(instance);
 
-			return Reset(instance, ref presentationParameters);
+			var ret = Reset(instance, ref presentationParameters);
+		    return ret;
 		}
 
 		unsafe IntPtr WndProcDetour(IntPtr hwnd, int msg, IntPtr wparam, IntPtr lparam) {
@@ -189,9 +192,24 @@ namespace refw.D3D {
 					if (OnKeyPressed(wparam.ToInt32()))
 						return NativeAPI.DefWindowProc(hwnd, msg, wparam, lparam);
 				}
-			}
+			} else if (msg == NativeAPI.WM_GETMINMAXINFO) {
+			    var minmax = (NativeAPI.MinMaxInfo*) lparam;
+                
+			    minmax->ptMinTrackSize.X = 100;
+                minmax->ptMinTrackSize.Y = 100;
 
-			return NativeAPI.CallWindowProc(old_wndproc, hwnd, msg, wparam, lparam);
+			    return IntPtr.Zero;
+            } else if (msg == NativeAPI.WM_WINDOWPOSCHANGING) {
+                var wndpos = (NativeAPI.WindowPos*) lparam;
+                var result = NativeAPI.CallWindowProc(old_wndproc, hwnd, msg, wparam, lparam);
+                if (EnforceWindowSize.HasValue) {
+                    wndpos->cx = Math.Min(wndpos->cx, EnforceWindowSize.Value.X);
+                    wndpos->cy = Math.Min(wndpos->cx, EnforceWindowSize.Value.Y);
+                }
+                return result;
+            }
+
+		    return NativeAPI.CallWindowProc(old_wndproc, hwnd, msg, wparam, lparam);
 		}
 
 		public void Dispose() {
@@ -212,6 +230,7 @@ namespace refw.D3D {
 		public bool MoveWindow(int x, int y, int width, int height) {
 			var result = NativeAPI.MoveWindow(Hwnd, x, y, width, height, true);
 			NativeAPI.SendMessage(Hwnd, 0x232, IntPtr.Zero, IntPtr.Zero);
+            NativeAPI.SetWindowPos(Hwnd, IntPtr.Zero, x, y, width, height, 0x0002);
 			return result;
 		}
 
@@ -222,11 +241,35 @@ namespace refw.D3D {
 			NativeAPI.SendMessage(Hwnd, NativeAPI.WM_LBUTTONUP, wparam, lparam);
 		}
 
-		public refw.NativeAPI.Rect? GetClientRect() {
-			refw.NativeAPI.Rect rect;
-			if (!NativeAPI.GetClientRect(Hwnd, out rect))
-				return null;
-			return rect;
-		}
+        public void MoveMouse(int x, int y) {
+            var pos = new NativeAPI.Point();
+            pos.X = x;
+            pos.Y = y;
+            NativeAPI.ClientToScreen(Hwnd, ref pos);
+            NativeAPI.SetCursorPos(pos.X, pos.Y);
+            var lparam = (IntPtr)(y << 16 | x);
+            NativeAPI.SendMessage(Hwnd, NativeAPI.WM_MOUSEMOVE, IntPtr.Zero, lparam);
+
+        }
+
+        public refw.NativeAPI.Rect? GetClientRect() {
+            refw.NativeAPI.Rect rect;
+            if (!NativeAPI.GetClientRect(Hwnd, out rect))
+                return null;
+            return rect;
+        }
+
+        public refw.NativeAPI.Rect? GetDesktopRect() {
+            var hwnd = NativeAPI.GetDesktopWindow();
+            refw.NativeAPI.Rect rect;
+            if (!NativeAPI.GetClientRect(hwnd, out rect))
+                return null;
+            return rect;
+        }
+
+	    public void BringToFront() {
+            NativeAPI.SetCapture(Hwnd);
+            NativeAPI.SetForegroundWindow(Hwnd);
+	    }
 	}
 }

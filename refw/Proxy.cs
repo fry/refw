@@ -41,42 +41,37 @@ namespace refw {
 					var connect_orig = LocalHook.GetProcAddress("Ws2_32", "connect");
 					proxyDetour = new ConnectDelegate(reCLR.Loader.ConnectHookWrapper);
 					proxyHook = LocalHook.Create(connect_orig, proxyDetour, null);
-					proxyHook.ThreadACL.SetExclusiveACL(new int[] { });
-
+					
 					// Hook WinSocks WSAConnect
 					var wsa_connect_orig = LocalHook.GetProcAddress("Ws2_32", "WSAConnect");
 					proxyDetourWSA = new WSAConnectDelegate(reCLR.Loader.WSAConnectHookWrapper);
 					proxyHookWSA = LocalHook.Create(wsa_connect_orig, proxyDetourWSA, null);
-					proxyHookWSA.ThreadACL.SetExclusiveACL(new int[] { });
 
 					// Hook getpeername to return original socket name
                     var getpeerame_orig = LocalHook.GetProcAddress("Ws2_32", "getpeername");
                     proxyNameDetour = new GetsocknameDelegate(reCLR.Loader.GetpeernameHookWrapper);
                     proxyNameHook = LocalHook.Create(getpeerame_orig, proxyNameDetour, null);
-                    proxyNameHook.ThreadACL.SetExclusiveACL(new int[] { });
 
 					var wsaioctl_orig = LocalHook.GetProcAddress("Ws2_32", "WSAIoctl");
                     proxyDetourWSAIoctl = new WSAIoctlDelegate(reCLR.Loader.WSAIoctlWrapper);
                     proxyHookWSAIoctl = LocalHook.Create(wsaioctl_orig, proxyDetourWSAIoctl, null);
-                    proxyHookWSAIoctl.ThreadACL.SetExclusiveACL(new int[] { });
+				}
 
-					// Hook InternetOpen for HTTP connections
-					/*var internetopen_orig = LocalHook.GetProcAddress("Wininet", "InternetOpenW");
-					internetOpenDetour = new InternetOpenDelegate(reCLR.Loader.InternetOpenHookWrapper);
-					internetOpenHook = LocalHook.Create(internetopen_orig, internetOpenDetour, null);
-					internetOpenHook.ThreadACL.SetExclusiveACL(new int[] { });*/
+			    if (value) {
+			        proxyHook.ThreadACL.SetExclusiveACL(new int[] {});
+			        proxyHookWSA.ThreadACL.SetExclusiveACL(new int[] {});
+			        proxyNameHook.ThreadACL.SetExclusiveACL(new int[] {});
+			        proxyHookWSAIoctl.ThreadACL.SetExclusiveACL(new int[] {});
 
                     reCLR.Loader.OnProxyError = OnProxyErrorCallback;
-				} else if (proxyHook != null && !value) {
-					proxyHook.Dispose();
-					proxyHook = null;
+			    } else if (proxyHook != null) {
+                    proxyHook.ThreadACL.SetInclusiveACL(new int[] { });
+                    proxyHookWSA.ThreadACL.SetInclusiveACL(new int[] { });
+                    proxyNameHook.ThreadACL.SetInclusiveACL(new int[] { });
+                    proxyHookWSAIoctl.ThreadACL.SetInclusiveACL(new int[] { });
+                }
 
-					proxyHookWSA.Dispose();
-					proxyHookWSA = null;
-
-                    proxyNameHook.Dispose();
-                    proxyNameHook = null;
-				}
+			    reCLR.Loader.ProxyEnabled = value;
 			}
 
 			get {

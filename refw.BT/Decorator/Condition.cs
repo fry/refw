@@ -5,12 +5,16 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace refw.BT {
+    [DefaultBehavior]
     public class Condition : Decorator {
         public BehaviorProperty<bool> Predicate = null;
+        public BehaviorProperty<bool> Negate = false;
 
         private bool shouldRun;
         protected override void OnInitialize(Blackboard blackboard) {
-            shouldRun = CheckCondition(blackboard);
+            shouldRun = Predicate.GetValue(blackboard);
+            if (Negate.GetValue(blackboard))
+                shouldRun = !shouldRun;
         }
 
         protected override Status Update(Blackboard blackboard) {
@@ -23,7 +27,15 @@ namespace refw.BT {
         }
 
         public override bool CheckCondition(Blackboard blackboard) {
-            return Predicate.GetValue(blackboard);// && (Child == null || base.CheckCondition(blackboard));
+            if (!Predicate.GetValue(blackboard) && !Negate.GetValue(blackboard))
+                return false;
+
+            // If we have a child, and it can't run, abort. 
+            // If we don't have a child, but we can run, continue
+            if (Child != null && !Child.CheckCondition(blackboard))
+                return false;
+
+            return true;
         }
     }
 }

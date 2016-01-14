@@ -20,6 +20,8 @@ namespace reCLR {
 		static String^ LoadedAssemblyArgs;
 
 		static OnProxyErrorDelegate^ OnProxyError;
+		static bool ProxyEnabled;
+
 		static void Inject(int process_id, String^ assembly, String^ assembly_args, bool display_errors, int wakeup_thread_id);
 		static int CreateProcessAndInject(String^ process_name, String^ command_line, String^ assembly, bool display_errors);
 		static int CreateProcessAndInject(String^ process_name, String^ command_line, String^ assembly, String^ assembly_args, bool display_errors);

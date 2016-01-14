@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace refw.BT {
+    [DefaultBehavior]
     public class Wait: Behavior {
         public BehaviorProperty<TimeSpan> Time;
 

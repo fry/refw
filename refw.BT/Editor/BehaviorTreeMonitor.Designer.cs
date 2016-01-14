@@ -28,6 +28,7 @@
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
             this.treeBehavior = new System.Windows.Forms.TreeView();
             this.propertyGridBehavior = new System.Windows.Forms.PropertyGrid();
+            this.textVars = new System.Windows.Forms.TextBox();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
@@ -68,8 +69,9 @@
             // 
             // splitContainer1.Panel2
             // 
+            this.splitContainer1.Panel2.Controls.Add(this.textVars);
             this.splitContainer1.Panel2.Controls.Add(this.propertyGridBehavior);
-            this.splitContainer1.Size = new System.Drawing.Size(912, 547);
+            this.splitContainer1.Size = new System.Drawing.Size(912, 704);
             this.splitContainer1.SplitterDistance = 661;
             this.splitContainer1.TabIndex = 3;
             // 
@@ -78,23 +80,34 @@
             this.treeBehavior.Dock = System.Windows.Forms.DockStyle.Fill;
             this.treeBehavior.Location = new System.Drawing.Point(0, 0);
             this.treeBehavior.Name = "treeBehavior";
-            this.treeBehavior.Size = new System.Drawing.Size(661, 547);
+            this.treeBehavior.Size = new System.Drawing.Size(661, 704);
             this.treeBehavior.TabIndex = 1;
             this.treeBehavior.AfterSelect += new System.Windows.Forms.TreeViewEventHandler(this.treeBehavior_AfterSelect);
             // 
             // propertyGridBehavior
             // 
-            this.propertyGridBehavior.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.propertyGridBehavior.Dock = System.Windows.Forms.DockStyle.Top;
             this.propertyGridBehavior.Location = new System.Drawing.Point(0, 0);
             this.propertyGridBehavior.Name = "propertyGridBehavior";
-            this.propertyGridBehavior.Size = new System.Drawing.Size(247, 547);
+            this.propertyGridBehavior.Size = new System.Drawing.Size(247, 312);
             this.propertyGridBehavior.TabIndex = 0;
+            // 
+            // textVars
+            // 
+            this.textVars.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.textVars.Location = new System.Drawing.Point(3, 318);
+            this.textVars.Multiline = true;
+            this.textVars.Name = "textVars";
+            this.textVars.Size = new System.Drawing.Size(241, 383);
+            this.textVars.TabIndex = 1;
             // 
             // BehaviorTreeMonitor
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(936, 600);
+            this.ClientSize = new System.Drawing.Size(936, 757);
             this.Controls.Add(this.splitContainer1);
             this.Controls.Add(this.button1);
             this.Controls.Add(this.checkBox1);
@@ -102,6 +115,7 @@
             this.Text = "BehaviorTreeMonitor";
             this.splitContainer1.Panel1.ResumeLayout(false);
             this.splitContainer1.Panel2.ResumeLayout(false);
+            this.splitContainer1.Panel2.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).EndInit();
             this.splitContainer1.ResumeLayout(false);
             this.ResumeLayout(false);
@@ -116,5 +130,6 @@
         private System.Windows.Forms.SplitContainer splitContainer1;
         private System.Windows.Forms.TreeView treeBehavior;
         private System.Windows.Forms.PropertyGrid propertyGridBehavior;
+        private System.Windows.Forms.TextBox textVars;
     }
 }

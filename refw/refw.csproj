@@ -10,9 +10,17 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>refw</RootNamespace>
     <AssemblyName>refw</AssemblyName>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
+    <SccProjectName>
+    </SccProjectName>
+    <SccLocalPath>
+    </SccLocalPath>
+    <SccAuxPath>
+    </SccAuxPath>
+    <SccProvider>
+    </SccProvider>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -53,10 +61,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Cache\CachedValue.cs" />
+    <Compile Include="Cache\StaticTimedCache.cs" />
     <Compile Include="Cache\StaticCache.cs" />
     <Compile Include="Cache\StaticCachedValue.cs" />
     <Compile Include="D3D9Hook\EndSceneDetour.cs" />
-    <Compile Include="D3D9Hook\NativeAPI.cs" />
+    <Compile Include="Extensions.cs" />
+    <Compile Include="NativeAPI.cs" />
+    <Compile Include="Debug\Inspection.cs" />
     <Compile Include="MemoryPatch.cs" />
     <Compile Include="PELoader\PEFile.cs" />
     <Compile Include="PELoader\Structures.cs" />

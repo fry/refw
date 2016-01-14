@@ -68,7 +68,7 @@ namespace refw {
             reCLR.Loader.UnloadAndReloadDomain();
         }
 
-		static string BuildCommandLine(string[] args) {
+		public static string BuildCommandLine(string[] args) {
 			return String.Join(" ", args.Select(s => String.Format("\"{0}\"", s)));
 		}
 

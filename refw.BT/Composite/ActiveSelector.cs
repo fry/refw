@@ -11,6 +11,7 @@ namespace refw.BT {
     /// infront of the currently active child if they can run, and then attempts to abort the currently
     /// active behavior.
     /// </summary>
+    [DefaultBehavior]
     public class ActiveSelector : Composite {
         int currentChild;
 
@@ -26,8 +27,9 @@ namespace refw.BT {
                 if (child.CheckCondition(blackboard)) {
                     // Attempt to abort the child, and yield if it can't abort yet
                     var current = Children[currentChild];
+                    Log(String.Format("Aborting child {0} because {1} wants to run", currentChild, i));
                     if (current.TickAbort(blackboard) != Status.Aborted)
-                        return current.Status;
+                        return Status.Running;
 
                     currentChild = i;
                     break;
@@ -48,11 +50,11 @@ namespace refw.BT {
             return Status.Failure;
         }
 
-        protected override Status Abort(Blackboard blackboard) {
-            Status = Children[currentChild].TickAbort(blackboard);
-            if (Status == Status.Aborted)
-                Reset();
-            return Status;
+        protected override Status Abort(Blackboard blackboard, bool forced) {
+            var child = Children[currentChild];
+            if (!child.IsFinished)
+                return child.TickAbort(blackboard, forced);
+            return Status.Aborted;
         }
 
         public override bool CheckCondition(Blackboard blackboard) {

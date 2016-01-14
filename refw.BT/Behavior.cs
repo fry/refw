@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 
 namespace refw.BT
 {
+    public class DefaultBehaviorAttribute: Attribute {}
+
     public enum Status {
         Invalid,
         Success,
@@ -28,6 +30,8 @@ namespace refw.BT
     public abstract class Behavior {
         public Status Status { get; protected set; }
         public RepeatMode RepeatMode { get; set; }
+        public string Name { get; set; }
+        public bool DoLog { get; set; }
 
         protected Behavior() {
             RepeatMode = RepeatMode.Never;
@@ -41,8 +45,7 @@ namespace refw.BT
         /// <returns></returns>
         protected abstract Status Update(Blackboard blackboard);
 
-        protected virtual Status Abort(Blackboard blackboard) {
-            // Default behavior on abort is to reset the node
+        protected virtual Status Abort(Blackboard blackboard, bool forced) {
             Reset();
             return Status.Aborted;
         }
@@ -53,12 +56,21 @@ namespace refw.BT
         //[DebuggerStepThrough]
         public Status TickUpdate(Blackboard blackboard) {
             if (!IsRunning) {
+                Log("Initialized");
                 OnInitialize(blackboard);
             }
 
-            Status = Update(blackboard);
+            try {
+                Status = Update(blackboard);
+                Log("Updated with status " + Status.ToString());
+            } catch (Exception e) {
+                Trace.WriteLine("Exception in behavior!");
+                Trace.WriteLine(e.ToString());
+                Status = Status.Failure;
+            }
 
             if (!IsRunning) {
+                Log("Terminated");
                 OnTerminate(Status);
             }
 
@@ -73,17 +85,22 @@ namespace refw.BT
             return Status;
         }
 
-        public Status TickAbort(Blackboard blackboard) {
+        public Status TickAbort(Blackboard blackboard, bool forced = false) {
+            if (Status == Status.Invalid || IsFinished)
+                Status = Status.Aborted;
+
             if (!IsFinished)
-                Status = Abort(blackboard);
+                Status = Abort(blackboard, forced);
 
             if (!IsRunning)
                 OnTerminate(Status);
 
+            Log("Abort with status " + Status.ToString());
             return Status;
         }
 
         public void Reset() {
+            Log("Reset");
             Status = Status.Invalid;
         }
 
@@ -100,7 +117,7 @@ namespace refw.BT
         }
 
         public virtual bool CheckCondition(Blackboard blackboard) {
-            return false;
+            return true;//return RepeatMode == RepeatMode.Forever || RepeatMode == RepeatMode.UntilSuccess;
         }
 
         public virtual int GetMaxChildren() {
@@ -115,6 +132,35 @@ namespace refw.BT
             return GetType()
                 .GetFields()
                 .Where(p => p.FieldType.IsSubclassOf(typeof (BasicBehaviorProperty)));
+        }
+
+        public override string ToString() {
+            return Name ?? GetType().Name;
+        }
+
+        public void Log(object text) {
+            if (DoLog)
+                Trace.WriteLine(String.Format("{0}: {1}", ToString(), text.ToString()));
+        }
+
+        public Behavior FindChildByName(string name) {
+            return FindChildren(b => b.Name == name).FirstOrDefault();
+        }
+
+        public IEnumerable<Behavior> FindChildren(Predicate<Behavior> pred) {
+            foreach (var behavior in GetChildren()) {
+                if (pred(behavior))
+                    yield return behavior;
+                foreach (var result in behavior.FindChildren(pred)) {
+                    yield return result;
+                }
+            }
+        }
+
+        public bool IsDefaultBehavior {
+            get {
+                return GetType().GetCustomAttribute<DefaultBehaviorAttribute>() != null;
+            }
         }
     }
 }

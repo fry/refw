@@ -7,21 +7,24 @@ using System.Threading.Tasks;
 
 namespace refw.BT {
     public class Blackboard {
+        public bool Paused = false;
+
         static Dictionary<string, MethodInfo> behaviorTemplates = new Dictionary<string, MethodInfo>();
 
         static Blackboard() {
             // Iterate through all types in all loaded assemblies looking for methods
             // with the BehaviorTemplate attribute
             foreach(var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
+                if (assembly.IsDynamic)
+                    continue;
+
                 foreach (var type in assembly.ExportedTypes) {
                     foreach (var method in type.GetMethods().Where(m => m.IsStatic)) {
                         var prop = method.GetCustomAttribute<BehaviorTemplateAttribute>();
                         if (prop == null)
                             continue;
 
-                        var name = prop.Name;
-                        if (name == null)
-                            name = method.Name;
+                        var name = prop.Name ?? method.Name;
                         behaviorTemplates.Add(name, method);
                     }
                 }

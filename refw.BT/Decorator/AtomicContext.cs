@@ -6,19 +6,17 @@ using System.Threading.Tasks;
 
 namespace refw.BT {
     /// <summary>
-    /// This decorator prevents preemption of its child, blocking aborts until it finishes running.
+    /// The opposite of the Atomic decorator. The child will always be aborted if a higher up parent wants to run.
     /// </summary>
-    public class Atomic : Decorator {
+    public class AtomicContext: Decorator {
         protected override Status Update(Blackboard blackboard) {
             return Child.TickUpdate(blackboard);
         }
 
         protected override Status Abort(Blackboard blackboard, bool forced) {
-            if (forced)
-                return base.Abort(blackboard, true);
-            if (!Child.IsFinished)
-                Child.TickUpdate(blackboard);
-            return Child.IsFinished ? Status.Aborted : Status.Aborting;
+            if (Child == null)
+                return Status.Aborted;
+            return Child.TickAbort(blackboard, true);
         }
     }
 }

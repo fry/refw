@@ -8,7 +8,7 @@ namespace refw {
         public abstract class CachedValue<T> {
             bool forceRefresh = false;
             readonly Func<T> getValue;
-            T cachedValue = default(T);
+            protected T cachedValue = default(T);
 
             public CachedValue(Func<T> getValue) {
                 this.getValue = getValue;

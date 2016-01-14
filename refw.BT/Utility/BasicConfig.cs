@@ -10,7 +10,7 @@ using System.Xml.Serialization;
 namespace refw.BT.Utility {
     public class BasicConfig : ICloneable {
         [XmlIgnore]
-        public string Filename;
+        public string Filename { get; set; }
 
         public BasicConfig() {
         }

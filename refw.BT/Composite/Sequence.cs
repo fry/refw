@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace refw.BT {
+    [DefaultBehavior]
     public class Sequence : Composite {
         List<Behavior>.Enumerator CurrentChild;
 
@@ -26,18 +27,17 @@ namespace refw.BT {
             }
         }
 
-        protected override Status Abort(Blackboard blackboard) {
-            Status = CurrentChild.Current.TickAbort(blackboard);
+        protected override Status Abort(Blackboard blackboard, bool forced) {
+            Status = CurrentChild.Current.TickAbort(blackboard, forced);
             return Status;
         }
-
+        
         public override bool CheckCondition(Blackboard blackboard) {
             foreach (var child in Children) {
-                if (!child.CheckCondition(blackboard))
-                    return false;
+                return child.CheckCondition(blackboard);
             }
 
-            return true;
+            return false;
         }
     }
 }

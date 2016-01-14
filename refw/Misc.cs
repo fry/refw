@@ -5,6 +5,7 @@ using System.Text;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
 using System.IO;
+using EasyHook;
 
 namespace refw {
 	public class Misc {
@@ -51,5 +52,56 @@ namespace refw {
 			var base_address = (uint)Process.GetCurrentProcess().MainModule.BaseAddress;
 			return new IntPtr(base_address + addr);
 		}
+
+        // GetAdaptersInfo Hook
+	    private static LocalHook getAdaptersInfoHook;
+	    private static NativeAPI.GetAdaptersInfo GetAdaptersInfo;
+
+	    private static int MyGetAdaptersInfo(IntPtr pAdapterInfo, ref Int64 pBufOutLen) {
+	        var result = GetAdaptersInfo(pAdapterInfo, ref pBufOutLen);
+	        if (result != 0)
+	            return result;
+
+	        var entry = pAdapterInfo;
+
+            var random = new Random(Identity.GetHashCode());
+
+	        do {
+	            var structure = (NativeAPI.IP_ADAPTER_INFO)Marshal.PtrToStructure(entry, typeof (NativeAPI.IP_ADAPTER_INFO));
+
+                // Randomize the MAC address
+                var random_data = new byte[structure.AddressLength];
+                random.NextBytes(random_data);
+                Array.Copy(random_data, structure.Address, random_data.Length);
+                
+                Marshal.StructureToPtr(structure, entry, false);
+                entry = structure.Next;
+
+	        } while (entry != IntPtr.Zero);
+
+	        return result;
+	    }
+
+	    private static string identityStr;
+
+	    public static string Identity {
+	        get {
+	            return identityStr;
+	        }
+	        set {
+	            identityStr = value;
+
+	            if (value != null) {
+	                if (getAdaptersInfoHook == null) {
+	                    var addr = LocalHook.GetProcAddress("iphlpapi.dll", "GetAdaptersInfo");
+	                    GetAdaptersInfo = refw.Misc.GetDelegate<NativeAPI.GetAdaptersInfo>(addr);
+	                    getAdaptersInfoHook = LocalHook.Create(addr, new NativeAPI.GetAdaptersInfo(MyGetAdaptersInfo), null);
+	                }
+	                getAdaptersInfoHook.ThreadACL.SetExclusiveACL(new Int32[] {});
+	            } else {
+                    getAdaptersInfoHook.ThreadACL.SetInclusiveACL(new Int32[] { });
+	            }
+	        }
+	    }
 	}
 }

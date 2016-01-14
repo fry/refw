@@ -42,14 +42,22 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Behavior.cs" />
+    <Compile Include="BehaviorAsync.cs" />
+    <Compile Include="Decorator\AtomicContext.cs" />
     <Compile Include="Composite\Composite.cs" />
     <Compile Include="Composite\ActiveSelector.cs" />
     <Compile Include="Composite\Parallel.cs" />
     <Compile Include="Decorator\Atomic.cs" />
+    <Compile Include="Decorator\FixedResult.cs" />
+    <Compile Include="Decorator\ActiveListSelector.cs" />
+    <Compile Include="Decorator\ListSelector.cs" />
+    <Compile Include="Decorator\Iterator.cs" />
     <Compile Include="Decorator\SetAndCheck.cs" />
     <Compile Include="Decorator\Decorator.cs" />
     <Compile Include="Decorator\Inverter.cs" />
     <Compile Include="Decorator\Repeater.cs" />
+    <Compile Include="Decorator\Throttled.cs" />
+    <Compile Include="Decorator\TimeOut.cs" />
     <Compile Include="Editor\BehaviorPropertyControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
@@ -72,7 +80,9 @@
     <Compile Include="Leaves\Action.cs" />
     <Compile Include="Decorator\Condition.cs" />
     <Compile Include="Decorator\IsSet.cs" />
+    <Compile Include="Leaves\TreeTemplate.cs" />
     <Compile Include="Leaves\Set.cs" />
+    <Compile Include="Leaves\SetIfNotSet.cs" />
     <Compile Include="Leaves\Template.cs" />
     <Compile Include="Leaves\Wait.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

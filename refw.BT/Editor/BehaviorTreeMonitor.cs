@@ -12,6 +12,7 @@ namespace refw.BT.Editor {
     public partial class BehaviorTreeMonitor : Form {
         class BehaviorTreeNode : TreeNode {
             public Behavior Behavior;
+            private Status oldStatus;
 
             public BehaviorTreeNode(Behavior behavior) {
                 this.Behavior = behavior;
@@ -20,6 +21,22 @@ namespace refw.BT.Editor {
             }
 
             public void Refresh() {
+                UpdateStatus();
+
+                foreach (var node in Nodes) {
+                    ((BehaviorTreeNode)node).Refresh();
+                }
+            }
+
+            void UpdateStatus() {
+                if (Behavior.Status == oldStatus)
+                    return;
+
+                if (Behavior.Status != Status.Running)
+                    Collapse();
+                else
+                    Expand();
+            
                 if (Behavior.Status == Status.Success) {
                     BackColor = Color.Green;
                     ForeColor = Color.White;
@@ -40,9 +57,7 @@ namespace refw.BT.Editor {
                     ForeColor = Color.White;
                 }
 
-                foreach (var node in Nodes) {
-                    ((BehaviorTreeNode)node).Refresh();
-                }
+                oldStatus = Behavior.Status;
             }
         }
         private Behavior root;
@@ -50,7 +65,7 @@ namespace refw.BT.Editor {
         public BehaviorTreeMonitor(Behavior root) {
             this.root = root;
 
-            refreshTimer.Interval = 100;
+            refreshTimer.Interval = 50;
             refreshTimer.Tick += refreshTimer_Tick;
             refreshTimer.Start();
             InitializeComponent();
@@ -92,6 +107,25 @@ namespace refw.BT.Editor {
                 return;
 
             var bnode = (BehaviorTreeNode) e.Node;
+            textVars.Clear();
+            foreach (var field in bnode.Behavior.GetType().GetFields()) {
+                if (field.FieldType.IsSubclassOf(typeof(BasicBehaviorProperty))) {
+                    var prop = (BasicBehaviorProperty)field.GetValue(bnode.Behavior);
+                    var name = field.Name;
+                    object val = null;
+                    try {
+                        val = prop.GetLastValue();
+                    } catch (Exception ex) {
+                        val = "<exception>";
+                    }
+
+                    try {
+                        textVars.AppendText(String.Format("{0} ({1}, {2}) = {3}", name, prop.GetValueType().Name, prop.GetValueSource(), val));
+                        textVars.AppendText(Environment.NewLine);
+                    } catch (Exception ex) {
+                    }
+                }
+            }
 
             propertyGridBehavior.SelectedObject = bnode.Behavior;
         }

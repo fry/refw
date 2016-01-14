@@ -8,13 +8,20 @@ namespace refw.BT {
     public class Template: Decorator {
         public BehaviorProperty<string> TemplateName;
 
+        private string resolvedTemplateName = "NOT RESOLVED";
         protected override void OnInitialize(Blackboard blackboard) {
-            if (Child == null)
-                Child = blackboard.InstanciateTemplate(TemplateName.GetValue(blackboard));
+            if (Child == null) {
+                resolvedTemplateName = TemplateName.GetValue(blackboard);
+                Child = blackboard.InstanciateTemplate(resolvedTemplateName);
+            }
         }
 
         protected override Status Update(Blackboard blackboard) {
             return Child.TickUpdate(blackboard);
+        }
+
+        public override string ToString() {
+            return "Template: " + resolvedTemplateName;
         }
     }
 }

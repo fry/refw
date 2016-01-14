@@ -12,7 +12,7 @@ namespace refw.Cache {
 
         public override bool IsValid {
             get {
-                return isCached;
+                return isCached && cachedValue != null;
             }
         }
 

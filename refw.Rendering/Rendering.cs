@@ -25,14 +25,17 @@ namespace refw.Rendering
             }
         }
 
-        private StateBlock state_old;
         public Device Device { private set; get; }
+        public event Action OnRender;
+        public System.Drawing.Font DefaultFont = new System.Drawing.Font(FontFamily.GenericSansSerif, 14);
+
+        private StateBlock state_old;
         private IntPtr device_ptr;
         private VertexDeclaration vert_decl_nocolor;
         protected refw.D3D.EndSceneDetour detour;
 
         private VertexBuffer vb_cube;
-        public Font Font;
+        private Dictionary<System.Drawing.Font, Font> fontCache = new Dictionary<System.Drawing.Font, Font>();
 
         public abstract class RenderEntry {
             public string Tag;
@@ -86,8 +89,6 @@ namespace refw.Rendering
             return false;
         }
 
-        protected virtual void OnRender() {}
-
         public void Setup(refw.D3D.EndSceneDetour detour) {
             this.detour = detour;
 
@@ -96,22 +97,38 @@ namespace refw.Rendering
             detour.OnResetDevice += new Action<IntPtr>(DirectX_OnResetDevice);
         }
 
+        public Font GetFont(System.Drawing.Font font) {
+            if (Device == null)
+                return null;
+            Font result;
+            if (!fontCache.TryGetValue(font, out result)) {
+                result = new Font(Device, font);
+                fontCache[font] = result;
+            }
+            return result;
+        }
+
         void DirectX_OnResetDevice(IntPtr obj) {
             DisposeReferences();
         }
 
         void DisposeReferences() {
             if (Device != null) {
+                if (state_old != null)
+                    state_old.Dispose();
+                if (vb_cube != null)
+                    vb_cube.Dispose();
+                if (vert_decl_nocolor != null)
+                    vert_decl_nocolor.Dispose();
+                foreach (var font in fontCache) {
+                    font.Value.Dispose();
+                }
                 Device.Dispose();
-                state_old.Dispose();
-                vb_cube.Dispose();
-                vert_decl_nocolor.Dispose();
-                Font.Dispose();
                 Device = null;
                 vert_decl_nocolor = null;
                 vb_cube = null;
                 state_old = null;
-                Font = null;
+                fontCache.Clear();
             }
         }
 
@@ -119,6 +136,9 @@ namespace refw.Rendering
             DisposeReferences();
 
             device_ptr = detour.Direct3DDevice9;
+            if (device_ptr == IntPtr.Zero)
+                return;
+
             Device = Device.FromPointer(device_ptr);
 
             state_old = new StateBlock(Device, StateBlockType.All);
@@ -182,25 +202,23 @@ namespace refw.Rendering
         	};
 
             vert_decl_nocolor = new VertexDeclaration(Device, vertexElems);
-
-            Font = new Font(Device, new System.Drawing.Font(System.Drawing.FontFamily.GenericSansSerif, 14));
         }
 
         void DirectX_OnFrame(TimeSpan delta) {
-            if (!IsEnabled || !IsReady())
-                return;
-
             // Attempt to recreate the device if we removed it; WoW does weird device recreating after resetting it on a lost device
             if (Device == null || Device.Disposed) {
                 DirectX_OnCreateDevice();
                 return;
             }
 
+            if (!IsEnabled || !IsReady())
+                return;
+
             // If the device is currently in the lost state don't continue
             var cooplevel = Device.TestCooperativeLevel();
             if (cooplevel.IsFailure)
                 return;
-
+            
             // Store the game's render states
             state_old.Capture();
 
@@ -211,10 +229,10 @@ namespace refw.Rendering
             device.PixelShader = null;
             device.VertexShader = null;
             device.SetTexture(0, null);
-            device.SetRenderState(RenderState.Lighting, false);
+            device.SetRenderState(RenderState.Lighting, true);
             device.SetRenderState(RenderState.AlphaBlendEnable, false);
+            device.SetRenderState(RenderState.AlphaTestEnable, false);
             device.SetRenderState(RenderState.BlendOperation, BlendOperation.Add);
-            var t = device.GetRenderState(RenderState.BlendFactor);
 
             device.SetRenderState(RenderState.BlendFactor, Color.White.ToArgb());
             device.SetRenderState(RenderState.DestinationBlend, Blend.InverseSourceAlpha);
@@ -226,6 +244,11 @@ namespace refw.Rendering
 
             device.SetRenderState(RenderState.ZEnable, false);
 
+            // Force a white ambient material so we can apply the color through the global ambient color
+            device.SetRenderState(RenderState.AmbientMaterialSource, ColorSource.Material);
+            var mat = new Material();
+            mat.Ambient = new Color4(System.Drawing.Color.White);
+            device.Material = mat;
 
             Matrix mat_view, mat_proj;
 
@@ -318,13 +341,14 @@ namespace refw.Rendering
                 foreach (var label in Labels) {
                     var transformed = Vector3.Project(label.Position, viewport.X, viewport.Y, viewport.Width, viewport.Height, viewport.MinZ, viewport.MaxZ, viewproj);
                     if (transformed.Z <= 1.0f)
-                        Font.DrawString(null, label.Text, (int)transformed.X, (int)transformed.Y, new Color4(label.Color));
+                        GetFont(DefaultFont).DrawString(null, label.Text, (int)transformed.X, (int)transformed.Y, new Color4(label.Color));
                 }
 
                 //device.Material = new Material();
             }
 
-            OnRender();
+            if (OnRender != null)
+                OnRender();
 
             // Restore render states
             state_old.Apply();
