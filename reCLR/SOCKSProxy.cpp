@@ -138,7 +138,7 @@ int proxy_negotiate(ConnectFunc func, SOCKET s, const sockaddr *name, int namele
 		else if (func == CF_WSACONNECT)
 			error_code = WSAConnect(s, (sockaddr*)&g_proxyService, sizeof(g_proxyService), lpCallerData, lpCalleeData, lpSQOS, lpGQOS);
 		else if (func == CF_CONNECTEX) {
-			bool success = g_ConnectEx(s, (sockaddr*)&g_proxyService, sizeof(g_proxyService), NULL, 0, lpdwBytesSent, lpOverlapped);
+			/*bool success = g_ConnectEx(s, (sockaddr*)&g_proxyService, sizeof(g_proxyService), NULL, 0, lpdwBytesSent, lpOverlapped);
 			if (!success) {
 				error_code = WSAGetLastError();
 				if (error_code == WSA_IO_PENDING) {
@@ -148,8 +148,9 @@ int proxy_negotiate(ConnectFunc func, SOCKET s, const sockaddr *name, int namele
 					break;
 				}
 				break;
-			}
+			}*/
 
+			error_code = connect(s, (sockaddr*)&g_proxyService, sizeof(g_proxyService));
 		}
 
 		if (error_code != 0) {
@@ -163,6 +164,8 @@ int proxy_negotiate(ConnectFunc func, SOCKET s, const sockaddr *name, int namele
 			else if (wsa_error_code != WSAEINVAL && wsa_error_code != WSAEALREADY)
 				break;
 			first_try = false;
+		} else {
+			break;
 		}
 	}
 	
@@ -192,9 +195,15 @@ int proxy_negotiate(ConnectFunc func, SOCKET s, const sockaddr *name, int namele
 	error_code = send(s, (char*)&data_identify.front(), data_identify.size(), 0);
 
 	if (error_code == SOCKET_ERROR) {
+		auto wsa_error_code = WSAGetLastError();
+		auto wsa2_error_code = GetLastError();
 		if (reCLR::Loader::OnProxyError != nullptr)
 			reCLR::Loader::OnProxyError(reCLR::ProxyErrorType::ConnectFailed, "Send 1 failed");
 		WSASetLastError(WSAENETDOWN);
+		if (func == CF_CONNECTEX) {
+			WSASetLastError(WSAENETUNREACH);
+			return 0;
+		}
 		return SOCKET_ERROR;
 	}
 
@@ -207,6 +216,10 @@ int proxy_negotiate(ConnectFunc func, SOCKET s, const sockaddr *name, int namele
 		if (reCLR::Loader::OnProxyError != nullptr)
 			reCLR::Loader::OnProxyError(reCLR::ProxyErrorType::ConnectFailed, "Recv 1 failed");
 		WSASetLastError(WSAENETDOWN);
+		if (func == CF_CONNECTEX) {
+			WSASetLastError(WSAENETUNREACH);
+			return 0;
+		}
 		return SOCKET_ERROR;
 	}
 
@@ -215,6 +228,10 @@ int proxy_negotiate(ConnectFunc func, SOCKET s, const sockaddr *name, int namele
 			reCLR::Loader::OnProxyError(reCLR::ProxyErrorType::AuthFailed, "SOCKS5 proxy does not support authentication methods 0 or 2");
 		closesocket(s);
 		WSASetLastError(WSAENETDOWN);
+		if (func == CF_CONNECTEX) {
+			WSASetLastError(WSAENETUNREACH);
+			return 0;
+		}
 		return SOCKET_ERROR;
 	}
 
@@ -233,6 +250,10 @@ int proxy_negotiate(ConnectFunc func, SOCKET s, const sockaddr *name, int namele
 			if (reCLR::Loader::OnProxyError != nullptr)
 				reCLR::Loader::OnProxyError(reCLR::ProxyErrorType::ConnectFailed, "Auth Send 1 failed");
 			WSASetLastError(WSAENETDOWN);
+			if (func == CF_CONNECTEX) {
+				WSASetLastError(WSAENETUNREACH);
+				return 0;
+			}
 			return SOCKET_ERROR;
 		}
 
@@ -244,6 +265,10 @@ int proxy_negotiate(ConnectFunc func, SOCKET s, const sockaddr *name, int namele
 			if (reCLR::Loader::OnProxyError != nullptr)
 				reCLR::Loader::OnProxyError(reCLR::ProxyErrorType::ConnectFailed, "Auth Recv 1 failed");
 			WSASetLastError(WSAENETDOWN);
+			if (func == CF_CONNECTEX) {
+				WSASetLastError(WSAENETUNREACH);
+				return 0;
+			}
 			return SOCKET_ERROR;
 		}
 
@@ -252,6 +277,10 @@ int proxy_negotiate(ConnectFunc func, SOCKET s, const sockaddr *name, int namele
 				reCLR::Loader::OnProxyError(reCLR::ProxyErrorType::AuthFailed, "SOCKS5 proxy authentication failed");
 			closesocket(s);
 			WSASetLastError(WSAENETDOWN);
+			if (func == CF_CONNECTEX) {
+				WSASetLastError(WSAENETUNREACH);
+				return 0;
+			}
 			return SOCKET_ERROR;
 		}
 	}
@@ -280,6 +309,8 @@ int proxy_negotiate(ConnectFunc func, SOCKET s, const sockaddr *name, int namele
 		if (reCLR::Loader::OnProxyError != nullptr)
 			reCLR::Loader::OnProxyError(reCLR::ProxyErrorType::ConnectFailed, "Send 2 failed"); 
 		WSASetLastError(WSAENETDOWN);
+		if (func == CF_CONNECTEX)
+			return 0;
 		return SOCKET_ERROR;
 	}
 
@@ -291,6 +322,10 @@ int proxy_negotiate(ConnectFunc func, SOCKET s, const sockaddr *name, int namele
 		if (reCLR::Loader::OnProxyError != nullptr)
 			reCLR::Loader::OnProxyError(reCLR::ProxyErrorType::ConnectFailed, "Recv 2 failed");
 		WSASetLastError(WSAENETDOWN);
+		if (func == CF_CONNECTEX) {
+			WSASetLastError(WSAENETUNREACH);
+			return 0;
+		}
 		return SOCKET_ERROR;
 	}	
 
@@ -304,6 +339,10 @@ int proxy_negotiate(ConnectFunc func, SOCKET s, const sockaddr *name, int namele
 			reCLR::Loader::OnProxyError(reCLR::ProxyErrorType::ConnectFailed, String::Format("SOCKS5 proxy connection request failed: error code {0}", data_response[1]));
 		closesocket(s);
 		WSASetLastError(WSAENETDOWN);
+		if (func == CF_CONNECTEX) {
+			WSASetLastError(WSAENETUNREACH);
+			return 0;
+		}
 		return SOCKET_ERROR;
 	}
 
@@ -314,6 +353,8 @@ int proxy_negotiate(ConnectFunc func, SOCKET s, const sockaddr *name, int namele
 	// reuse and low number of sockets shouldn't make this matter anyway
 	g_real_peernames[s] = std::shared_ptr<SocknameWrapper>(new SocknameWrapper(name, namelen));
 
+	if (func == CF_CONNECTEX)
+		return 1;
 	return 0;
 }
 
