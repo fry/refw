@@ -64,6 +64,7 @@
     <Compile Include="Cache\StaticTimedCache.cs" />
     <Compile Include="Cache\StaticCache.cs" />
     <Compile Include="Cache\StaticCachedValue.cs" />
+    <Compile Include="D3D9Hook\DX11Hook.cs" />
     <Compile Include="D3D9Hook\EndSceneDetour.cs" />
     <Compile Include="Extensions.cs" />
     <Compile Include="NativeAPI.cs" />
