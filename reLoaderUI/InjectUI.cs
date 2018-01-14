@@ -71,7 +71,7 @@ namespace reLoaderUI {
             if (radioTargetProcess.Checked) {
                 selected_process = (comboProcessList.SelectedItem as ProcessListEntry).Process;
             } else if (radioProcessName.Checked) {
-                selected_process = Process.GetProcessesByName(comboProcessList.SelectedItem as String).FirstOrDefault();
+                selected_process = Process.GetProcessesByName(comboProcessName.SelectedItem as String).FirstOrDefault();
             }
 
             if (selected_process == null)
@@ -86,6 +86,21 @@ namespace reLoaderUI {
 
         private void comboProcessName_DropDown(object sender, EventArgs e) {
             RefreshProcessList();
+        }
+
+        private void textInjectDLL_DragEnter(object sender, DragEventArgs e) {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop)) {
+                e.Effect = DragDropEffects.Link;
+            } else {
+                e.Effect = DragDropEffects.None;
+            }
+        }
+
+        private void textInjectDLL_DragDrop(object sender, DragEventArgs e) {
+            var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+            if (files != null && files.Length > 0) {
+                textInjectDLL.Text = files[0];
+            }
         }
     }
 }

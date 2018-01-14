@@ -40,7 +40,7 @@ namespace refw {
 		}
 
 		public static unsafe IntPtr GetVTableFunction(IntPtr obj, int index) {
-			return Marshal.ReadIntPtr(Marshal.ReadIntPtr(obj), index * 4);
+			return Marshal.ReadIntPtr(Marshal.ReadIntPtr(obj), index * sizeof(void*));
 		}
 
 		/// <summary>

@@ -25,7 +25,7 @@ using namespace System::Diagnostics;
 using namespace msclr::interop;
 using namespace refw;
 
-static CLRParameters* clrParams;
+static CLRParameters* clrParams = NULL;
 
 // Parses a command line string into its argument according to the Windows default
 static array<String^>^ SplitArgs(String^ command_line) {
@@ -136,7 +136,7 @@ void ThreadInitialize() {
 }
 
 extern "C" __declspec(dllexport) void WakeUpProcess() {
-	if (clrParams->WakeUpThreadID == 0)
+	if (clrParams == NULL || clrParams->WakeUpThreadID == 0)
 		return;
 	HANDLE handle = OpenThread(THREAD_SUSPEND_RESUME, FALSE, clrParams->WakeUpThreadID);
 	ResumeThread(handle);
@@ -157,7 +157,11 @@ extern "C" __declspec(dllexport) DWORD WINAPI Initialize(LPVOID threadData) {
 
 
 static const const char* DLL_FILE = "reCLR.dll";
-static const const char* DLL_EXPORT = "_Initialize@4";
+#ifdef _WIN64
+	static const const char* DLL_EXPORT = "Initialize";
+#else
+	static const const char* DLL_EXPORT = "_Initialize@4";
+#endif
 
 /*void EnableDebugPriv() {
     HANDLE hToken;

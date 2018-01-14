@@ -7,8 +7,8 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace refw {
-    public class DX11Hook {
+namespace refw.D3D {
+    public class DX11Hook: DirectXHook {
         private const int DXGI_FORMAT_R8G8B8A8_UNORM = 0x1C;
         private const int DXGI_USAGE_RENDER_TARGET_OUTPUT = 0x20;
         private const int D3D11_SDK_VERSION = 7;
@@ -63,14 +63,12 @@ namespace refw {
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         delegate IntPtr PresentF(IntPtr pThis, uint SyncInterval, uint flags);
 
-        public event Action OnPresent;
-
         LocalHook presentHook;
         PresentF presentDelegateOrig;
         PresentF presentDelegate;
 
         public DX11Hook() {
-
+            // TODO: Determine main window
         }
 
         public void SetupDetour() {
@@ -105,7 +103,7 @@ namespace refw {
         }
 
         IntPtr MyPresent(IntPtr swapChain, uint syncInterval, uint flags) {
-            OnPresent?.Invoke();
+            ArtificialEndScene();
             return presentDelegateOrig(swapChain, syncInterval, flags);
         }
     }

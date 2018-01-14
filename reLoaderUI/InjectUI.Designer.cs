@@ -70,12 +70,15 @@
             // 
             // textInjectDLL
             // 
+            this.textInjectDLL.AllowDrop = true;
             this.textInjectDLL.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.textInjectDLL.Location = new System.Drawing.Point(12, 120);
             this.textInjectDLL.Name = "textInjectDLL";
             this.textInjectDLL.Size = new System.Drawing.Size(437, 20);
             this.textInjectDLL.TabIndex = 2;
+            this.textInjectDLL.DragDrop += new System.Windows.Forms.DragEventHandler(this.textInjectDLL_DragDrop);
+            this.textInjectDLL.DragEnter += new System.Windows.Forms.DragEventHandler(this.textInjectDLL_DragEnter);
             // 
             // textDLLArguments
             // 
